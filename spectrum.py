@@ -2,9 +2,18 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import brukeropusreader as opus
+from random import sample
+import logging
+
 
 
 class Spectrum:
+    #error_log = os.path.join(os.getcwd(), 'errlog.txt')
+    logging.basicConfig(level=logging.INFO,
+                        filemode='w',
+                        filename=os.path.join(os.getcwd(), 'log.txt'),
+                        format='%(asctime)s %(levelname)s %(message)s')
+
     def __init__(self, directory: str):
         self.directory = directory  # from which we load the spectra
         self.names = list()  # names of files
@@ -25,70 +34,92 @@ class Spectrum:
         #     self.X = np.array(self.data)   
         
         
-def read_data(path, classify=False, recursive=False):
+def read_data(path=None, classify=False, recursive=False):
     '''
     rtype: (List[paths: str], List[classes: str])
     ''' 
-    paths, classes = [], []
-    
-    for dirpath, dirnames, filenames in os.walk(path):
+    paths = []
+    if path is None:
+        path = '.'
+    base = os.path.basename(path)
+    for dirpath, _, filenames in os.walk(path):
         for filename in filenames:
             paths.append(os.path.join(dirpath, filename))
     paths = list(filter(filter_opus, paths))
-    mask = [True] * len(paths)
+
     if not paths:
-        return paths, classes
-    
-    delimiter = '\\' if '\\' in paths[0] else '/'
-    if not classify:
-        classes = [path] * (len(paths))
-        if not recursive:
-            for i, path in enumerate(paths):
-                path = path.split(delimiter)
-                if len(path) == 2:
-                    mask[i] = False
-    else:
-        for i, path in enumerate(paths):
-            path = path.split(delimiter)
-            if len(path) == 2:
-                classes.append(None)
-                mask[i] = False
-            elif len(path) == 3:
-                classes.append(path[1])
-            elif recursive:
-                classes.append(path[1])
-            else:
-                classes.append(None)
-                mask[i] = False
-    assert len(paths) == len(classes) == len(mask), "read_data, lengths of lists must be equal!"
-    paths = [paths[i] for i in range(len(paths)) if mask[i]]
-    classes = [classes[i] for i in range(len(classes)) if mask[i]] 
+        return paths, []
+
+    classes = [None] * len(paths)
+    for ind, path in enumerate(paths):
+        path_parts = path.split(os.sep)
+        if not classify and not recursive:
+            if len(path_parts) == 3:
+                classes[ind] = base
+        elif not classify and recursive:
+            classes[ind] = base
+        elif classify and not recursive:
+            if len(path_parts) == 3:
+                classes[ind] = path_parts[1]
+        else:
+            if len(path_parts) >= 3:
+                classes[ind] = path_parts[1]
+
+    paths = [paths[i] for i, cls in enumerate(classes) if cls is not None]
+    classes = [cls for cls in classes if cls is not None]
+
     return paths, classes
            
 def filter_opus(path):
     ext = path[path.rfind('.') + 1:]
     if not ext.isdigit():
         return False
+    with open(path, 'r') as f:
+        try:
+            f.read()
+            return False
+        except:
+            return True
+
+def read_opus(path):
+    x, y = [], []
     try:
-        f = open(path, 'r')
-        f.read()
-        return False
-    except:
-        return True
+        logging.info(f"Trying to open file: {path}")
+        file = opus.read_file(path)
+        x = file.get_range()
+        y = file['AB']
+        logging.info(f'{path} is successfully read.')
+    except Exception as err:
+        logging.error(f'Error occured!', exc_info=True)
     finally:
-        f.close()
-        
-    
-    
-        
-         
+        return x, y
+
+
+
+def show_spectra(classified_spectra):
+    classes = set(map(lambda x: x[1], classified_spectra))
+    colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
+    colors = dict(zip(classes, colors))
+    plt.figure()
+    lines = []
+    clrs = []
+    for spc, cls in classified_spectra:
+        x, y = read_opus(spc)
+        if len(x) != 0:
+            lines.append(plt.plot(x, y, c=colors[cls]))
+            clrs.append(cls)
+        #print(cls, ': ', max(y))
+    plt.legend(clrs)
+    plt.xlabel('wavenumber, cm-1')
+    plt.ylabel('intensity')
+    plt.show()
+
+
 if __name__ == '__main__':
-     
-    for i, j in zip(*read_data(r'delta', classify=False, recursive=False)):
-        print(j, i, sep='\t\t')
+    paths= list(zip(*read_data(classify=True, recursive=False)))
+    paths = sample(paths, 3)
+    show_spectra(paths)
+    # for i, j in zip(*read_data(r"C:\Users\user\PycharmProjects\spectrum\data", classify=False, recursive=True)):
+    #     print(j, i, sep='\t\t')
+
     
-    
-	
-        
-        
-        
