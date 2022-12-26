@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -74,11 +76,6 @@ class Spectrum:
 		self.wavenums = self.wavenums[mask]
 		
 
-			
-		
-				
-			
-
 	def normalize(self, method=NormMode.VECTOR):
 		if method == NormMode.AREA:
 			norm_coef = np.sum(self.data)
@@ -110,22 +107,32 @@ class Spectrum:
 	def get_derivative(self, n=1, win_wight=13, order=5):
 		self.data = savgol_filter(
 			self.data, win_wight, polyorder=order, deriv=n)
-  
-	def get_global_max(self):
-		max_intensity = max(self.data)
-		ind_max = self.wavenums.index(max_intensity)
-		return ind_max, max_intensity
 
-	def get_global_in(self):
-		min_intensity = min(self.data)
-		ind_min = self.wavenums.index(min_intensity)
-		return ind_min, min_intensity
+	def get_extrema(self, locals=True, minima=False):
+		indices = []
+		wavenums = []
+		iextr = 1
 
-	def get_all_max(self):
-		pass
+		if minima:
+			f = lambda i: self.data[i - 1] > self.data[i] and self.data[i] < self.data[i + 1]
+			comp = lambda i, iextr: self.data[i] < self.data[iextr]
+		else:
+			f = lambda i: self.data[i - 1] < self.data[i] and self.data[i] > self.data[i + 1]
+			comp = lambda i, iextr: self.data[i] > self.data[iextr]
 
-	def get_all_min(self):
-		pass
+		for i in range(1, len(self) - 2):
+			if f(i):
+				indices.append(i)
+				wavenums.append(self.wavenums[i])
+				iextr = i if comp(i, iextr) else iextr
+
+		if not locals:
+			return iextr, self.wavenums[iextr]
+		return indices, wavenums
+
+
+
+
   
 	def standartizate(self):
 		pass
@@ -135,30 +142,45 @@ class Spectrum:
 
 	def std(self):
 		pass
+
+
 	def __add__(self, other):
-		pass
+		s = deepcopy(self)
+		if isinstance(other, (float, int)):
+			s.data -= other
+		elif hasattr(other, '__iter__') and self.is_comparable(other):
+			s.data = self.data + other.data
+		else:
+			raise Exception('Spectra should have the same wavenumber ranges!')
+		return s
 
 	def __mul__(self, other):
-		pass
+		s = deepcopy(self)
+		if isinstance(other, (float, int)):
+			s.data -= other
+		elif hasattr(other, '__iter__') and self.is_comparable(other):
+			s.data = self.data * other.data
+		else:
+			raise Exception('Spectra should have the same wavenumber ranges!')
+		return s
 
 	def __sub__(self, other):
 		'''
 		resulting spectrum inherits all the attributes of the first argument
 		'''
-		s = Spectrum(wavenums=self.wavenums,
-                    clss= self.clss
-                    )
-		try:
-			other = float(other)
-			if other == float('nan'):
-				raise ValueError()
+		s = deepcopy(self)
+		if isinstance(other, (float, int)):
 			s.data -= other
-		except:
-			if len(self) == len(other) \
-			and self.wavenums[0] == other.wavenums[0] \
-				and self.wavenums[-1] == other.wavenums[-1]:
-				s.data = self.data - other.data
+		elif hasattr(other, '__iter__') and self.is_comparable(other):
+			s.data = self.data - other.data
+		else:
+			raise Exception('Spectra should have the same wavenumber ranges!')
 		return s
+
+	def is_comparable(self, other):
+		return len(self) == len(other) \
+			and self.wavenums[0] == other.wavenums[0] \
+				and self.wavenums[-1] == other.wavenums[-1]
 		
 
 	def change_size(self, sample):
@@ -345,26 +367,31 @@ def show_spectra(spectra, path=''):
 
 
 if __name__ == '__main__':
-	
+	print('HI')
 	# f = opus.read_file(r'C:\Users\user\PycharmProjects\spectrum\SD10.30')
 	# print(*[it for it in f.items()], sep='\n\n')
-	sp = get_spectra_list(
-		path='Спектры сывороток животных/Черепаха raw', recursive=False)[0]
-	# print(sp)
+	# sp = get_spectra_list(
+	# 	recursive=False)[0]
 	# for spec in sp:
 	# 	spec.select([3000, 2000], [1110, -1])
-	# show_spectra(sp)
+	#show_spectra([sp])
+
+	s = Spectrum(wavenums=list(map(float, range(9))), data=[0., 3., 2., 4., 1., 3., 2., 4., 0.])
+	print(s.get_extrema(locals=False, minima=False))
+	print(s.get_extrema(locals=False, minima=True))
+	print(s.get_extrema(locals=True, minima=False))
+	print(s.get_extrema(locals=True, minima=True))
 		
-	sp1 = Spectrum(path=sp.path, clss='alss')
-	sp1.correct_baseline(method=BaseLineMode.ALSS)
-	sp2 = Spectrum(path=sp.path, clss='rb')
-	sp2.correct_baseline(method=BaseLineMode.RB)
-	sp3 = Spectrum(path=sp.path, clss='zhang')
-	sp3.correct_baseline(method=BaseLineMode.ZHANG)
-	sp4 = Spectrum(path=sp.path, clss='deriv')
-	sp4.correct_baseline(method=BaseLineMode.ZHANG)
-	sp4.smooth(window_length=31, polyorder=5)
-	sp4.get_derivative(n=2)
-	sp4.data *= sp3.data
-	sp4.normalize(method=NormMode.MINMAX)
-	show_spectra([sp, sp1, sp2, sp3, sp4])
+	# sp1 = Spectrum(path=sp.path, clss='alss')
+	# sp1.correct_baseline(method=BaseLineMode.ALSS)
+	# sp2 = Spectrum(path=sp.path, clss='rb')
+	# sp2.correct_baseline(method=BaseLineMode.RB)
+	# sp3 = Spectrum(path=sp.path, clss='zhang')
+	# sp3.correct_baseline(method=BaseLineMode.ZHANG)
+	# sp4 = Spectrum(path=sp.path, clss='deriv')
+	# sp4.correct_baseline(method=BaseLineMode.ZHANG)
+	# sp4.smooth(window_length=31, polyorder=5)
+	# sp4.get_derivative(n=2)
+	# sp4.data *= sp3.data
+	# sp4.normalize(method=NormMode.MINMAX)
+	# show_spectra([sp, sp1, sp2, sp3, sp4])
