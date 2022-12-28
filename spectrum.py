@@ -1,5 +1,4 @@
 from copy import deepcopy
-
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -13,15 +12,12 @@ from scipy.linalg import cholesky
 from scipy.signal import savgol_filter
 from BaselineRemoval import BaselineRemoval
 from enums import NormMode, BaseLineMode
-from bisect import bisect_left
 
 #add range
-#roll back -- to original state
-# переместить гетрейндж для интов в show_spectrum
-#show_spectra - an empty list?
+#range as a class?
 #show specta - give intervals
 # Проверить, почему не работает rubberband
-
+# add associativity to the operations
 
 class Spectrum:
 	ATR_to_AB = 1000
@@ -37,10 +33,10 @@ class Spectrum:
 			self.wavenums, self.data = Spectrum.read_opus(path)
 		else:
 			self.wavenums, self.data = wavenums, data
-			Spectrum.spectrum_id += 1
+		Spectrum.spectrum_id += 1
 		self.id = Spectrum.spectrum_id
 		self.clss = clss
-		self.step = self.wavenums[1] - self.wavenums[0] if len(self.wavenums) > 1 else 0
+		self.step = abs(self.wavenums[1] - self.wavenums[0]) if len(self.wavenums) > 1 else 0
 
 
 	def __len__(self):
@@ -52,13 +48,17 @@ class Spectrum:
 	def __bool__(self):
 		return len(self.wavenums) != 0
 
-	def __getitem__(self, w):
-		return self.wavenums[w]
+	def __getitem__(self, ind):
+		return self.wavenums[ind], self.data[ind]
 
-	def range(self, start, stop):
-		start_ind = bisect_left(self, start)
-		stop_ind = bisect_left(self, stop)
-		return self.wavenums[start_ind:stop_ind], self.data[start_ind:stop_ind]
+	def range(self, bigger, lesser):
+		start_ind = int((self.wavenums[0] - bigger) / self.step)  if bigger < self.wavenums[0] else 0
+		stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step)  if lesser > self.wavenums[-1] else len(self)
+		s = self * 1
+		s.wavenums = s.wavenums[start_ind:stop_ind]
+		s.data = s.data[start_ind:stop_ind]
+		return s
+
 
 	def select(self, *intervals): 
 		"""
@@ -125,41 +125,44 @@ class Spectrum:
 				indices.append(i)
 				wavenums.append(self.wavenums[i])
 				iextr = i if comp(i, iextr) else iextr
-
 		if not locals:
 			return iextr, self.wavenums[iextr]
 		return indices, wavenums
 
+	def standartize(self):
+		self.data = (self.data - self.mean) / self.std
 
-
-
-  
-	def standartizate(self):
-		pass
-
+	@property
 	def mean(self):
-		pass
+		return np.mean(self.data)
 
+	@property
 	def std(self):
-		pass
+		return np.std(self.data)
 
+	def reset(self):
+		self.wavenums, self.data = Spectrum.read_opus(self.path)
 
 	def __add__(self, other):
 		s = deepcopy(self)
+		Spectrum.spectrum_id += 1
+		s.id = Spectrum.spectrum_id
 		if isinstance(other, (float, int)):
-			s.data -= other
+			s.data += other
 		elif hasattr(other, '__iter__') and self.is_comparable(other):
-			s.data = self.data + other.data
+			s.data += other.data
 		else:
 			raise Exception('Spectra should have the same wavenumber ranges!')
 		return s
 
 	def __mul__(self, other):
 		s = deepcopy(self)
+		Spectrum.spectrum_id += 1
+		s.id = Spectrum.spectrum_id
 		if isinstance(other, (float, int)):
-			s.data -= other
+			s.data *= other
 		elif hasattr(other, '__iter__') and self.is_comparable(other):
-			s.data = self.data * other.data
+			s.data *= other.data
 		else:
 			raise Exception('Spectra should have the same wavenumber ranges!')
 		return s
@@ -169,10 +172,12 @@ class Spectrum:
 		resulting spectrum inherits all the attributes of the first argument
 		'''
 		s = deepcopy(self)
+		Spectrum.spectrum_id += 1
+		s.id = Spectrum.spectrum_id
 		if isinstance(other, (float, int)):
 			s.data -= other
 		elif hasattr(other, '__iter__') and self.is_comparable(other):
-			s.data = self.data - other.data
+			s.data -= other.data
 		else:
 			raise Exception('Spectra should have the same wavenumber ranges!')
 		return s
@@ -203,7 +208,7 @@ class Spectrum:
 			x = file.get_range()
 			y = file['AB']
 			logging.info(f'{path} is successfully read.')
-			Spectrum.spectrum_id += 1
+
 		except Exception as err:
 			logging.error(f'Error occured!', exc_info=True)
 		finally:
@@ -344,7 +349,9 @@ def filter_opus(path):
 			return True
 
 
-def show_spectra(spectra, path=''):
+def show_spectra(spectra, path='', wavenumbers=None):
+	if not spectra:
+		return
 	classes = list(sorted(set(map(lambda x: x.clss, spectra))))
 	colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
 	colors = dict(zip(classes, colors))
@@ -353,6 +360,8 @@ def show_spectra(spectra, path=''):
 	clrs = []
 	for spc in spectra:
 		if spc:
+			if wavenumbers:
+				spc = spc.range(*wavenumbers)
 			lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss]))
 			clrs.append(spc.clss)
 	if len(clrs) > 1:
@@ -370,17 +379,23 @@ if __name__ == '__main__':
 	print('HI')
 	# f = opus.read_file(r'C:\Users\user\PycharmProjects\spectrum\SD10.30')
 	# print(*[it for it in f.items()], sep='\n\n')
-	# sp = get_spectra_list(
-	# 	recursive=False)[0]
+	sp = get_spectra_list(
+		recursive=False)[0]
 	# for spec in sp:
 	# 	spec.select([3000, 2000], [1110, -1])
-	#show_spectra([sp])
+	# show_spectra([sp])
+	#sp = sp.range(4000, 2578)
+	plt.plot(rubberband(sp.wavenums, sp.data))
+	show_spectra([sp])
+	# sp.reset()
+	# show_spectra([sp])
 
-	s = Spectrum(wavenums=list(map(float, range(9))), data=[0., 3., 2., 4., 1., 3., 2., 4., 0.])
-	print(s.get_extrema(locals=False, minima=False))
-	print(s.get_extrema(locals=False, minima=True))
-	print(s.get_extrema(locals=True, minima=False))
-	print(s.get_extrema(locals=True, minima=True))
+
+	# s = Spectrum(wavenums=list(map(float, range(9))), data=[0., 3., 2., 4., 1., 3., 2., 4., 0.])
+	# print(s.get_extrema(locals=False, minima=False))
+	# print(s.get_extrema(locals=False, minima=True))
+	# print(s.get_extrema(locals=True, minima=False))
+	# print(s.get_extrema(locals=True, minima=True))
 		
 	# sp1 = Spectrum(path=sp.path, clss='alss')
 	# sp1.correct_baseline(method=BaseLineMode.ALSS)
