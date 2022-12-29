@@ -18,13 +18,16 @@ from enums import NormMode, BaseLineMode
 #show specta - give intervals
 # Проверить, почему не работает rubberband
 # add associativity to the operations
+# customize exceptions
+# ids when operations on spectra -- do we need them?
+# every list urn into dict
 
 class Spectrum:
 	ATR_to_AB = 1000
 	spectrum_id = 0
 	logging.basicConfig(level=logging.INFO,
 						filemode='w',
-						filename=os.path.join(os.getcwd(), 'log.txt'),
+						filename=os.path.join(os.getcwd(), 'errlog.txt'),
 						format='%(asctime)s %(levelname)s %(message)s')
 
 	def __init__(self, wavenums=[], data=[], path='', clss: str=''):
@@ -197,24 +200,27 @@ class Spectrum:
 
 		if sample_maxval >= spc_maxval and spc_minval >= sample_minval: # s lies inside the spectrum
 			for i in range(len(self)):
-				 pass
+				pass
 
 	@staticmethod
 	def read_opus(path):
 		x, y = [], []
 		try:
-			logging.info(f"Trying to open file: {path}")
 			file = opus.read_file(path)
 			x = file.get_range()
 			y = file['AB']
-			logging.info(f'{path} is successfully read.')
-
 		except Exception as err:
-			logging.error(f'Error occured!', exc_info=True)
+			logging.error(f'Reading {path}', exc_info=True)
 		finally:
 			if len(x) > 1:
 				return x[:-1], y[:-1]
 			return x, y
+
+def spectra_log(spectra_dict, path='log.txt'):
+    with open(path, 'w') as f:
+        for spc in spectra_dict:
+            print(spectra_dict[spc], file=f)
+    
 
 
 def baseline_alss(y, lam=1e6, p=1e-3, niter=10):
@@ -300,6 +306,12 @@ def get_spectra_list(**kwargs):
 		res.append(Spectrum(path=p, clss=clss))
 	return res
 
+def get_spectra_dict(**kwargs):
+	res = {}
+	for p, clss in zip(*read_data(**kwargs)):
+		s = Spectrum(path=p, clss=clss)
+		res[s.id] = s
+	return res
 
 def read_data(path=None, classify=False, recursive=False):
 	'''
@@ -356,13 +368,14 @@ def show_spectra(spectra, path='', wavenumbers=None):
 	colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
 	colors = dict(zip(classes, colors))
 	plt.figure()
+ 
 	lines = []
 	clrs = []
 	for spc in spectra:
 		if spc:
 			if wavenumbers:
 				spc = spc.range(*wavenumbers)
-			lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss]))
+			lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss], linewidth=0.5))
 			clrs.append(spc.clss)
 	if len(clrs) > 1:
 		plt.legend(clrs)
@@ -371,42 +384,31 @@ def show_spectra(spectra, path='', wavenumbers=None):
 	plt.ylabel('intensity')
 	if path:
 		plt.savefig(path)
-	plt.show()
-
+	else:
+		plt.show()
 
 
 if __name__ == '__main__':
 	print('HI')
 	# f = opus.read_file(r'C:\Users\user\PycharmProjects\spectrum\SD10.30')
 	# print(*[it for it in f.items()], sep='\n\n')
-	sp = get_spectra_list(
-		recursive=False)[0]
+	# sp = get_spectra_list(
+	# 	recursive=False)[0]
 	# for spec in sp:
 	# 	spec.select([3000, 2000], [1110, -1])
 	# show_spectra([sp])
 	#sp = sp.range(4000, 2578)
-	plt.plot(rubberband(sp.wavenums, sp.data))
-	show_spectra([sp])
+	# sp = get_spectra_list(
+	# 	path='Спектры сывороток животных/Черепаха raw', recursive=False)[0]
+	spca = get_spectra_dict(path=r'Спектры сывороток животных/Черепаха raw', recursive=False)
+	spectra_log(spca)
+	# sp_rb = sp * 1
+	# sp_rb.correct_baseline()
+	# sp_rb.clss = 'RB correction'
+	# show_spectra([sp, sp_rb])
+	
 	# sp.reset()
 	# show_spectra([sp])
 
 
-	# s = Spectrum(wavenums=list(map(float, range(9))), data=[0., 3., 2., 4., 1., 3., 2., 4., 0.])
-	# print(s.get_extrema(locals=False, minima=False))
-	# print(s.get_extrema(locals=False, minima=True))
-	# print(s.get_extrema(locals=True, minima=False))
-	# print(s.get_extrema(locals=True, minima=True))
-		
-	# sp1 = Spectrum(path=sp.path, clss='alss')
-	# sp1.correct_baseline(method=BaseLineMode.ALSS)
-	# sp2 = Spectrum(path=sp.path, clss='rb')
-	# sp2.correct_baseline(method=BaseLineMode.RB)
-	# sp3 = Spectrum(path=sp.path, clss='zhang')
-	# sp3.correct_baseline(method=BaseLineMode.ZHANG)
-	# sp4 = Spectrum(path=sp.path, clss='deriv')
-	# sp4.correct_baseline(method=BaseLineMode.ZHANG)
-	# sp4.smooth(window_length=31, polyorder=5)
-	# sp4.get_derivative(n=2)
-	# sp4.data *= sp3.data
-	# sp4.normalize(method=NormMode.MINMAX)
-	# show_spectra([sp, sp1, sp2, sp3, sp4])
+	
