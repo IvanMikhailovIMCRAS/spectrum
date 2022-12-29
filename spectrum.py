@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -11,15 +12,12 @@ from scipy.linalg import cholesky
 from scipy.signal import savgol_filter
 from BaselineRemoval import BaselineRemoval
 from enums import NormMode, BaseLineMode
-from bisect import bisect_left
 
 #add range
-#roll back -- to original state
-# переместить гетрейндж для интов в show_spectrum
-#show_spectra - an empty list?
+#range as a class?
 #show specta - give intervals
 # Проверить, почему не работает rubberband
-
+# add associativity to the operations
 
 class Spectrum:
 	ATR_to_AB = 1000
@@ -35,10 +33,10 @@ class Spectrum:
 			self.wavenums, self.data = Spectrum.read_opus(path)
 		else:
 			self.wavenums, self.data = wavenums, data
-			Spectrum.spectrum_id += 1
+		Spectrum.spectrum_id += 1
 		self.id = Spectrum.spectrum_id
 		self.clss = clss
-		self.step = self.wavenums[1] - self.wavenums[0] if len(self.wavenums) > 1 else 0
+		self.step = abs(self.wavenums[1] - self.wavenums[0]) if len(self.wavenums) > 1 else 0
 
 
 	def __len__(self):
@@ -50,13 +48,17 @@ class Spectrum:
 	def __bool__(self):
 		return len(self.wavenums) != 0
 
-	def __getitem__(self, w):
-		return self.wavenums[w]
+	def __getitem__(self, ind):
+		return self.wavenums[ind], self.data[ind]
 
-	def range(self, start, stop):
-		start_ind = bisect_left(self, start)
-		stop_ind = bisect_left(self, stop)
-		return self.wavenums[start_ind:stop_ind], self.data[start_ind:stop_ind]
+	def range(self, bigger, lesser):
+		start_ind = int((self.wavenums[0] - bigger) / self.step)  if bigger < self.wavenums[0] else 0
+		stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step)  if lesser > self.wavenums[-1] else len(self)
+		s = self * 1
+		s.wavenums = s.wavenums[start_ind:stop_ind]
+		s.data = s.data[start_ind:stop_ind]
+		return s
+
 
 	def select(self, *intervals): 
 		"""
@@ -73,11 +75,6 @@ class Spectrum:
 		self.data = self.data[mask]
 		self.wavenums = self.wavenums[mask]
 		
-
-			
-		
-				
-			
 
 	def normalize(self, method=NormMode.VECTOR):
 		if method == NormMode.AREA:
@@ -110,55 +107,85 @@ class Spectrum:
 	def get_derivative(self, n=1, win_wight=13, order=5):
 		self.data = savgol_filter(
 			self.data, win_wight, polyorder=order, deriv=n)
-  
-	def get_global_max(self):
-		max_intensity = max(self.data)
-		ind_max = self.wavenums.index(max_intensity)
-		return ind_max, max_intensity
 
-	def get_global_in(self):
-		min_intensity = min(self.data)
-		ind_min = self.wavenums.index(min_intensity)
-		return ind_min, min_intensity
+	def get_extrema(self, locals=True, minima=False):
+		indices = []
+		wavenums = []
+		iextr = 1
 
-	def get_all_max(self):
-		pass
+		if minima:
+			f = lambda i: self.data[i - 1] > self.data[i] and self.data[i] < self.data[i + 1]
+			comp = lambda i, iextr: self.data[i] < self.data[iextr]
+		else:
+			f = lambda i: self.data[i - 1] < self.data[i] and self.data[i] > self.data[i + 1]
+			comp = lambda i, iextr: self.data[i] > self.data[iextr]
 
-	def get_all_min(self):
-		pass
-  
-	def standartizate(self):
-		pass
+		for i in range(1, len(self) - 2):
+			if f(i):
+				indices.append(i)
+				wavenums.append(self.wavenums[i])
+				iextr = i if comp(i, iextr) else iextr
+		if not locals:
+			return iextr, self.wavenums[iextr]
+		return indices, wavenums
 
+	def standartize(self):
+		self.data = (self.data - self.mean) / self.std
+
+	@property
 	def mean(self):
-		pass
+		return np.mean(self.data)
 
+	@property
 	def std(self):
-		pass
+		return np.std(self.data)
+
+	def reset(self):
+		self.wavenums, self.data = Spectrum.read_opus(self.path)
+
 	def __add__(self, other):
-		pass
+		s = deepcopy(self)
+		Spectrum.spectrum_id += 1
+		s.id = Spectrum.spectrum_id
+		if isinstance(other, (float, int)):
+			s.data += other
+		elif hasattr(other, '__iter__') and self.is_comparable(other):
+			s.data += other.data
+		else:
+			raise Exception('Spectra should have the same wavenumber ranges!')
+		return s
 
 	def __mul__(self, other):
-		pass
+		s = deepcopy(self)
+		Spectrum.spectrum_id += 1
+		s.id = Spectrum.spectrum_id
+		if isinstance(other, (float, int)):
+			s.data *= other
+		elif hasattr(other, '__iter__') and self.is_comparable(other):
+			s.data *= other.data
+		else:
+			raise Exception('Spectra should have the same wavenumber ranges!')
+		return s
 
 	def __sub__(self, other):
 		'''
 		resulting spectrum inherits all the attributes of the first argument
 		'''
-		s = Spectrum(wavenums=self.wavenums,
-                    clss= self.clss
-                    )
-		try:
-			other = float(other)
-			if other == float('nan'):
-				raise ValueError()
+		s = deepcopy(self)
+		Spectrum.spectrum_id += 1
+		s.id = Spectrum.spectrum_id
+		if isinstance(other, (float, int)):
 			s.data -= other
-		except:
-			if len(self) == len(other) \
-			and self.wavenums[0] == other.wavenums[0] \
-				and self.wavenums[-1] == other.wavenums[-1]:
-				s.data = self.data - other.data
+		elif hasattr(other, '__iter__') and self.is_comparable(other):
+			s.data -= other.data
+		else:
+			raise Exception('Spectra should have the same wavenumber ranges!')
 		return s
+
+	def is_comparable(self, other):
+		return len(self) == len(other) \
+			and self.wavenums[0] == other.wavenums[0] \
+				and self.wavenums[-1] == other.wavenums[-1]
 		
 
 	def change_size(self, sample):
@@ -181,7 +208,7 @@ class Spectrum:
 			x = file.get_range()
 			y = file['AB']
 			logging.info(f'{path} is successfully read.')
-			Spectrum.spectrum_id += 1
+
 		except Exception as err:
 			logging.error(f'Error occured!', exc_info=True)
 		finally:
@@ -322,7 +349,9 @@ def filter_opus(path):
 			return True
 
 
-def show_spectra(spectra, path=''):
+def show_spectra(spectra, path='', wavenumbers=None):
+	if not spectra:
+		return
 	classes = list(sorted(set(map(lambda x: x.clss, spectra))))
 	colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
 	colors = dict(zip(classes, colors))
@@ -331,6 +360,8 @@ def show_spectra(spectra, path=''):
 	clrs = []
 	for spc in spectra:
 		if spc:
+			if wavenumbers:
+				spc = spc.range(*wavenumbers)
 			lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss]))
 			clrs.append(spc.clss)
 	if len(clrs) > 1:
@@ -345,26 +376,37 @@ def show_spectra(spectra, path=''):
 
 
 if __name__ == '__main__':
-	
+	print('HI')
 	# f = opus.read_file(r'C:\Users\user\PycharmProjects\spectrum\SD10.30')
 	# print(*[it for it in f.items()], sep='\n\n')
 	sp = get_spectra_list(
-		path='Спектры сывороток животных/Черепаха raw', recursive=False)[0]
-	# print(sp)
+		recursive=False)[0]
 	# for spec in sp:
 	# 	spec.select([3000, 2000], [1110, -1])
-	# show_spectra(sp)
+	# show_spectra([sp])
+	#sp = sp.range(4000, 2578)
+	plt.plot(rubberband(sp.wavenums, sp.data))
+	show_spectra([sp])
+	# sp.reset()
+	# show_spectra([sp])
+
+
+	# s = Spectrum(wavenums=list(map(float, range(9))), data=[0., 3., 2., 4., 1., 3., 2., 4., 0.])
+	# print(s.get_extrema(locals=False, minima=False))
+	# print(s.get_extrema(locals=False, minima=True))
+	# print(s.get_extrema(locals=True, minima=False))
+	# print(s.get_extrema(locals=True, minima=True))
 		
-	sp1 = Spectrum(path=sp.path, clss='alss')
-	sp1.correct_baseline(method=BaseLineMode.ALSS)
-	sp2 = Spectrum(path=sp.path, clss='rb')
-	sp2.correct_baseline(method=BaseLineMode.RB)
-	sp3 = Spectrum(path=sp.path, clss='zhang')
-	sp3.correct_baseline(method=BaseLineMode.ZHANG)
-	sp4 = Spectrum(path=sp.path, clss='deriv')
-	sp4.correct_baseline(method=BaseLineMode.ZHANG)
-	sp4.smooth(window_length=31, polyorder=5)
-	sp4.get_derivative(n=2)
-	sp4.data *= sp3.data
-	sp4.normalize(method=NormMode.MINMAX)
-	show_spectra([sp, sp1, sp2, sp3, sp4])
+	# sp1 = Spectrum(path=sp.path, clss='alss')
+	# sp1.correct_baseline(method=BaseLineMode.ALSS)
+	# sp2 = Spectrum(path=sp.path, clss='rb')
+	# sp2.correct_baseline(method=BaseLineMode.RB)
+	# sp3 = Spectrum(path=sp.path, clss='zhang')
+	# sp3.correct_baseline(method=BaseLineMode.ZHANG)
+	# sp4 = Spectrum(path=sp.path, clss='deriv')
+	# sp4.correct_baseline(method=BaseLineMode.ZHANG)
+	# sp4.smooth(window_length=31, polyorder=5)
+	# sp4.get_derivative(n=2)
+	# sp4.data *= sp3.data
+	# sp4.normalize(method=NormMode.MINMAX)
+	# show_spectra([sp, sp1, sp2, sp3, sp4])
