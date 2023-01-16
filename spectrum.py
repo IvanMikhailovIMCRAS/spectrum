@@ -12,23 +12,23 @@ from scipy.linalg import cholesky
 from scipy.signal import savgol_filter
 from BaselineRemoval import BaselineRemoval
 from enums import NormMode, BaseLineMode
+import exceptions
 
 #add range
-#range as a class?
 #show specta - give intervals
 # Проверить, почему не работает rubberband
-# add associativity to the operations
 # customize exceptions
-# ids when operations on spectra -- do we need them?
 # every list urn into dict
 
 class Spectrum:
 	ATR_to_AB = 1000
 	spectrum_id = 0
-	logging.basicConfig(level=logging.INFO,
-						filemode='w',
-						filename=os.path.join(os.getcwd(), 'errlog.txt'),
-						format='%(asctime)s %(levelname)s %(message)s')
+	__ops = {
+		'+': lambda x, y: x + y,
+		'-': lambda x, y: x - y,
+		'*': lambda x, y: x * y
+	}
+
 
 	def __init__(self, wavenums=[], data=[], path='', clss: str=''):
 		self.path = path #наследуем от себя 
@@ -54,9 +54,13 @@ class Spectrum:
 	def __getitem__(self, ind):
 		return self.wavenums[ind], self.data[ind]
 
+	def __iter__(self):
+		for i in range(len(self)):
+			yield self.wavenums[i], self.data[i]
+
 	def range(self, bigger, lesser):
-		start_ind = int((self.wavenums[0] - bigger) / self.step)  if bigger < self.wavenums[0] else 0
-		stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step)  if lesser > self.wavenums[-1] else len(self)
+		start_ind = int((self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
+		stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step) if lesser > self.wavenums[-1] else len(self)
 		s = self * 1
 		s.wavenums = s.wavenums[start_ind:stop_ind]
 		s.data = s.data[start_ind:stop_ind]
@@ -146,44 +150,64 @@ class Spectrum:
 	def reset(self):
 		self.wavenums, self.data = Spectrum.read_opus(self.path)
 
-	def __add__(self, other):
+	@classmethod
+	def __two_op_spectra_operation(cls, self, other, op):
 		s = deepcopy(self)
 		Spectrum.spectrum_id += 1
 		s.id = Spectrum.spectrum_id
 		if isinstance(other, (float, int)):
-			s.data += other
-		elif hasattr(other, '__iter__') and self.is_comparable(other):
-			s.data += other.data
+			s.data = Spectrum.__ops[op](self.data, other)
+		elif isinstance(other, Spectrum):
+			if self.is_comparable(other):
+				s.data = Spectrum.__ops[op](self.data, other.data)
+			else:
+				raise exceptions.SpcChangeEx
 		else:
-			raise Exception('Spectra should have the same wavenumber ranges!')
+			raise TypeError
 		return s
 
-	def __mul__(self, other):
-		s = deepcopy(self)
-		Spectrum.spectrum_id += 1
-		s.id = Spectrum.spectrum_id
+	@classmethod
+	def __in_place_spectra_operation(cls, self, other, op):
 		if isinstance(other, (float, int)):
-			s.data *= other
-		elif hasattr(other, '__iter__') and self.is_comparable(other):
-			s.data *= other.data
+			self.data = Spectrum.__ops[op](self.data, other)
+		elif isinstance(other, Spectrum):
+			if self.is_comparable(other):
+				self.data = Spectrum.__ops[op](self.data, other.data)
+			else:
+				raise exceptions.SpcChangeEx
 		else:
-			raise Exception('Spectra should have the same wavenumber ranges!')
-		return s
+			raise TypeError
+		return self
+
+	def __iadd__(self, other):
+		return Spectrum.__in_place_spectra_operation(self, other, '+')
+
+	def __isub__(self, other):
+		return Spectrum.__in_place_spectra_operation(self, other, '-')
+
+	def __imul__(self, other):
+		return Spectrum.__in_place_spectra_operation(self, other, '*')
+
+	def __add__(self, other):
+		return Spectrum.__two_op_spectra_operation(self, other, '+')
+
+	def __radd__(self, other):
+		return Spectrum.__two_op_spectra_operation(self, other, '+')
+
+	def __mul__(self, other):
+		return Spectrum.__two_op_spectra_operation(self, other, '*')
+
+	def __rmul__(self, other):
+		return Spectrum.__two_op_spectra_operation(self, other, '*')
 
 	def __sub__(self, other):
 		'''
 		resulting spectrum inherits all the attributes of the first argument
 		'''
-		s = deepcopy(self)
-		Spectrum.spectrum_id += 1
-		s.id = Spectrum.spectrum_id
-		if isinstance(other, (float, int)):
-			s.data -= other
-		elif hasattr(other, '__iter__') and self.is_comparable(other):
-			s.data -= other.data
-		else:
-			raise Exception('Spectra should have the same wavenumber ranges!')
-		return s
+		return Spectrum.__two_op_spectra_operation(self, other, '-')
+
+	def __rsub__(self, other):
+		return Spectrum.__two_op_spectra_operation(-1 * self,  other, '+')
 
 	def is_comparable(self, other):
 		return len(self) == len(other) \
@@ -209,8 +233,8 @@ class Spectrum:
 			file = opus.read_file(path)
 			x = file.get_range()
 			y = file['AB']
-		except Exception as err:
-			logging.error(f'Reading {path}', exc_info=True)
+		except exceptions.SpcReadingEx as err:
+			pass
 		finally:
 			if len(x) > 1:
 				return x[:-1], y[:-1]
@@ -239,7 +263,6 @@ def baseline_alss(y, lam=1e6, p=1e-3, niter=10):
 		z = spsolve(Z, w*y)
 		w = p * (y > z) + (1-p) * (y < z)
 	return y - z
-
 
 
 def rubberband(x, y):
@@ -390,18 +413,25 @@ def show_spectra(spectra, path='', wavenumbers=None):
 
 if __name__ == '__main__':
 	print('HI')
+	# s1 = Spectrum(wavenums=list(range(6)), data=list(range(6)))
+	# s2 = Spectrum(wavenums=list(range(6)), data=list(range(-5, 1)))
+	# print(s1.data)
+	# print(s2.data)
+	# s = s1 + s2
+	# print(s)
 	# f = opus.read_file(r'C:\Users\user\PycharmProjects\spectrum\SD10.30')
 	# print(*[it for it in f.items()], sep='\n\n')
-	# sp = get_spectra_list(
-	# 	recursive=False)[0]
-	# for spec in sp:
-	# 	spec.select([3000, 2000], [1110, -1])
-	# show_spectra([sp])
+	sp = get_spectra_list(
+		recursive=False)[:2]
+	sp[0] *= 1
+	show_spectra(sp)
+
+
 	#sp = sp.range(4000, 2578)
 	# sp = get_spectra_list(
 	# 	path='Спектры сывороток животных/Черепаха raw', recursive=False)[0]
-	spca = get_spectra_dict(path=r'Спектры сывороток животных/Черепаха raw', recursive=False)
-	spectra_log(spca)
+	# spca = get_spectra_dict(path=r'Спектры сывороток животных/Черепаха raw', recursive=False)
+	# spectra_log(spca)
 	# sp_rb = sp * 1
 	# sp_rb.correct_baseline()
 	# sp_rb.clss = 'RB correction'
