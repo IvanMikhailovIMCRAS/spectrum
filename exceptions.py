@@ -21,4 +21,9 @@ class SpcReadingEx(SpectrumEx):
     def __init__(self, *args):
         self.message = args[0] if args else 'File has been damaged. Failed to read.'
 
+class SpcCreationEx(SpectrumEx):
+    def __init__(self, *args):
+        self.message = args[0] if args else 'Invalid set of parameters!'
+
+
 
