@@ -9,3 +9,8 @@ class BaseLineMode(Enum):
     RB = 'rb'
     ALSS = 'alls'
     ZHANG = 'zhang'
+    
+class Scale(Enum):
+    WAVENUMBERS = 'Wavenumber cm-1'
+    WAVELENGTH_nm = 'Wavelength nm'
+    WAVELENGTH_um = 'Wavelength um'

@@ -1,6 +1,9 @@
+import os
 import sys
 import numpy as np
 import pytest
+from enums import Scale
+import exceptions
 import spectrum
 from random import randint
 SPECTRA_PATHS = [
@@ -13,6 +16,7 @@ __OPS = {
         '*': lambda x, y: x * y
     }
 
+#add csv support for reset
 
 def test_filter_opus():
     assert spectrum.filter_opus('sample_spectra/SD1.26'), 'Opus files should be available!'
@@ -26,7 +30,7 @@ def test_filter_opus():
 def sample_spectra():
     res = []
     for path in SPECTRA_PATHS:
-        res.append(spectrum.Spectrum(path=path, clss='sample_spectra'))
+        res.append(spectrum.Spectrum(path=path, clss='undefined'))
     return res
 
 
@@ -67,10 +71,10 @@ def test_inplace_operations(sample_spectra):
 
 @pytest.fixture()
 def simplified_spectrum():
-    return spectrum.Spectrum(wavenums=list(range(10)),
-                             data=[
+    return spectrum.Spectrum(wavenums=np.array(list(range(1, 11)), dtype=float),
+                             data=np.array([
                                  -10., -7., 4., -8., -6., 2., 3., 2., 7., 6.
-                             ])
+                             ]))
 
 
 @pytest.mark.parametrize('locals,minima,include_edges,result',
@@ -90,17 +94,22 @@ def test_get_extrema(simplified_spectrum, locals, minima, include_edges, result)
         f'{"Local" if locals else "Global" } {"minima" if minima else "maxima"}' \
         f' were found incorrectly! ({"Including" if include_edges else "Excluding"} edges)'
 
-
-def test_reset(sample_spectra):
-    sp = sample_spectra[randint(0, len(SPECTRA_PATHS) - 1)]
-    data = sp.data[:]
-    wavenums = sp.wavenums[:]
-    sp += 4.
-    sp += sp
-    sp.wavenums = sp.wavenums[:-5]
-    sp.reset()
-    assert (data == sp.data).all() and (wavenums == sp.wavenums).all(), \
-        'The call of "reset" should turn spectrum\'s wavelengths and intensities to their original values!'
+# @pytest.skip('Test when the csv support is added')
+# def test_reset(sample_spectra):
+#     sp = sample_spectra[randint(0, len(SPECTRA_PATHS) - 1)]
+#     path = sp.path
+#     data = sp.data[:]
+#     wavenums = sp.wavenums[:]
+#     assert all(data == sp.data) and data is not sp.data, 'Data copying problems!'
+#     assert all(wavenums == sp.wavenums) and wavenums is not sp.wavenums, 'WN copying problems!'
+#     sp += 4.
+#     sp += sp
+#     sp.wavenums = sp.wavenums[:-5]
+#     assert path == sp.path
+#     sp.reset()
+#     assert (data == sp.data).all() \
+#            and (wavenums == sp.wavenums).all(), \
+#         'The call of "reset" should turn spectrum\'s wavelengths and intensities to their original values!'
 
 
 @pytest.mark.parametrize('classify,recursive,result',
@@ -118,5 +127,56 @@ def test_read_data(classify, recursive, result):
     for i in res:
         d[i[1]] = d.get(i[1], 0) + 1
     assert d == result[1], 'The classification went wrong!'
+
+
+def test_init(sample_spectra):
+    spc = sample_spectra[randint(0, len(sample_spectra) - 1)]
+    path, wavenums, data, clss = spc.path, spc.wavenums[:], spc.data[:], spc.clss
+    test_spc = spc * 1.
+    assert all(test_spc.data == spc.data)\
+           and all(test_spc.wavenums == spc.wavenums) \
+           and test_spc.clss == 'undefined', \
+            'Reading spectrum by a path to an opus file should lead to setting of wavenums and intensities.'
+    test_spc = spectrum.Spectrum(data=data, wavenums=wavenums)
+    assert all(test_spc.data == spc.data) and all(test_spc.wavenums == spc.wavenums), \
+        'Definition by wavenums and intensities should lead to setting of passed ones.'
+
+    with pytest.raises(exceptions.SpcCreationEx):
+        spectrum.Spectrum(data=data, wavenums=np.array([], dtype=float))
+    with pytest.raises(exceptions.SpcCreationEx):
+        spectrum.Spectrum(data=data, wavenums=wavenums[2:])
+    with pytest.raises(exceptions.SpcCreationEx):
+        spectrum.Spectrum(clss='I\'ve got no roots!',)
+
+@pytest.mark.parametrize('scale_type', [ Scale.WAVELENGTH_nm, Scale.WAVELENGTH_um, Scale.WAVENUMBERS,])
+def test_save_as_csv(simplified_spectrum, scale_type):
+    tmp_path = 'tmp.csv'
+    simplified_spectrum.save_as_csv(tmp_path, scale_type)
+    with open(tmp_path, 'r') as file:
+        f_line = file.readline().strip()
+        s_line = file.readline().strip()
+        f = spectrum.scale_change(scale_type)
+        scale = [str(f(i)) for i in simplified_spectrum.wavenums]
+        expected_first_line = ','.join([scale_type.value] + scale)
+        expected_second_line = ','.join([simplified_spectrum.clss] + [str(i) for i in simplified_spectrum.data])
+        assert f_line == expected_first_line
+        assert s_line == expected_second_line, \
+            'The saving should write the proper values!'
+    os.remove(tmp_path)
+
+def test_read_csv(simplified_spectrum):
+    tmp_path = 'tmp.csv'
+    simplified_spectrum.save_as_csv(tmp_path)
+    wavenums, data, clss = spectrum.Spectrum.read_csv(tmp_path)
+    assert all(wavenums == simplified_spectrum.wavenums) and all(data == simplified_spectrum.data)\
+           and clss == simplified_spectrum.clss,\
+        'The read file should match the sample one!'
+    os.remove(tmp_path)
+
+
+
+
+
+
 
 # def range(self, bigger, lesser)

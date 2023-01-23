@@ -11,13 +11,14 @@ from scipy.spatial import ConvexHull
 from scipy.linalg import cholesky
 from scipy.signal import savgol_filter
 from BaselineRemoval import BaselineRemoval
-from enums import NormMode, BaseLineMode
+from enums import NormMode, BaseLineMode, Scale
 import exceptions
 
-#
+#add csv support for reset
 # add range
 # show specta - give intervals
 # Проверить, почему не работает rubberband
+# reader class common for spectrum and matrix?
 
 # interpolate
 # change size!!!
@@ -31,17 +32,20 @@ class Spectrum:
         '*': lambda x, y: x * y
     }
 
-    def __init__(self, wavenums=[], data=[], path='', clss: str = 'undefined'):
+    def __init__(self, wavenums=None, data=None, path='', clss: str = 'undefined'):
+        if wavenums is None:
+            wavenums, data = [], []
         self.path = path
-        self.clss = clss
         if path and path.endswith('.csv'):
-            self.wavenums, self.data, self.clss = Spectrum.read_csv(path)
+            self.wavenums, self.data, clss = Spectrum.read_csv(path)
         elif path:
             self.wavenums, self.data = Spectrum.__read_opus(path)
-        elif wavenums and data:
+        elif len(wavenums) == len(data) != 0:
             self.wavenums, self.data = wavenums, data
         else:
             raise exceptions.SpcCreationEx
+
+        self.clss = clss
         Spectrum.spectrum_id += 1
         self.id = Spectrum.spectrum_id
         self.step = abs(self.wavenums[1] - self.wavenums[0]) if len(self.wavenums) > 1 else 0
@@ -270,29 +274,39 @@ class Spectrum:
         '''
         with open(path, 'r') as csv:
             scale = csv.readline().split(',')
-            scale_type = scale[0]
-            if scale_type in ('Type', 'Wavelength'): # 'Type' refers to the case when the
-                f = lambda x: 10_000_000 / float(x)
-            else: # scale_type -- wavenums in cm-1
+            scale_type, *scale = scale
+            if scale_type == Scale.WAVENUMBERS.value:
                 f = float
-            scale = np.array([f(scale[i]) for i in range(1, len(scale))])
-            spc = csv.readline().strip().split(',')
-            clss = spc[0]
-            data = np.array([float(spc[i]) for i in range(1, len(spc))])
+            elif scale_type == Scale.WAVELENGTH_um.value:
+                f = lambda x: 10_000. / float(x)
+            else:
+                f = lambda x: 10_000_000. / float(x)
+            scale = np.array(list(map(f, scale)))
+            clss, *data = csv.readline().strip().split(',')
+            data = np.array(list(map(float, data)))
             return scale, data, clss
 
-    def save_as_csv(self, path, scale_type='Wavenumbers'):
-        if scale_type == 'Wavelengths':
+    def save_as_csv(self, path, scale_type=Scale.WAVENUMBERS):
+        if scale_type == Scale.WAVELENGTH_nm:
             scale = 10_000_000. / self.wavenums
+        elif scale_type == Scale.WAVELENGTH_um:
+            scale = 10_000. / self.wavenums
         else:
             scale = self.wavenums
         with open(path, 'w') as out:
-            print(scale_type, *scale, sep=',', file=out)
+            print(scale_type.value, *scale, sep=',', file=out)
             print(self.clss, *self.data, sep=',', file=out)
 
-    def intrerpolate(self):
+    def interpolate(self):
         pass
 
+def scale_change(scale_type):
+    if scale_type == Scale.WAVELENGTH_nm:
+         return lambda x: 10_000_000. / float(x)
+    elif scale_type == Scale.WAVELENGTH_um:
+        return lambda x: 10_000. / float(x)
+    else:
+        return lambda x: float(x) / 1.
 
 def spectra_log(spectra_dict, path='log.txt'):
     with open(path, 'w') as f:
