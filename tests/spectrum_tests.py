@@ -16,7 +16,7 @@ __OPS = {
         '*': lambda x, y: x * y
     }
 
-#add csv support for reset
+
 
 def test_filter_opus():
     assert spectrum.filter_opus('sample_spectra/SD1.26'), 'Opus files should be available!'
@@ -42,7 +42,7 @@ def test_operations(sample_spectra):
         data = np.array([__OPS[operation](sp1.data[i], sp2.data[i]) for i in range(len(sp1))])
         assert all(data == res.data), f'Operation {operation} result isn\'t right!'
         assert res.id != sp1.id, 'Not in-place operations should lead to creation of a spectrum with its own id!'
-        assert sp1.path == res.path, 'Path should be inherited from the first spectrum!'
+        assert sp1._path == res._path, 'Path should be inherited from the first spectrum!'
 
 
 def test_const_operations(sample_spectra):
@@ -56,17 +56,17 @@ def test_const_operations(sample_spectra):
         assert (data2 == sp2.data).all(), f'Operation {operation} for Spectrum - number pair is wrong!'
         assert (data3 == sp3.data).all(), f'Operation {operation} for reversed operand order (number  - Spectrum) pair is wrong!'
         assert sp3.id != sp2.id and sp2.id != sp1.id, 'Not in-place operations should lead to creation of a spectrum with its own id!'
-        assert sp3.path == sp2.path == sp1.path, 'Path should be inherited from the only spectrum used!'
+        assert sp3._path == sp2._path == sp1._path, 'Path should be inherited from the only spectrum used!'
 
 
 def test_inplace_operations(sample_spectra):
     sp1 = sample_spectra[randint(0, len(SPECTRA_PATHS) - 1)]
     id_sp = sp1.id
-    path_sp = sp1.path
+    path_sp = sp1._path
 
     sp2 = sample_spectra[1]
     sp1 += sp2
-    assert sp1.id == id_sp and sp1.path == path_sp, 'First spectrum characteristics shouldn\'t be altered!'
+    assert sp1.id == id_sp and sp1._path == path_sp, 'First spectrum characteristics shouldn\'t be altered!'
 
 
 @pytest.fixture()
@@ -94,27 +94,11 @@ def test_get_extrema(simplified_spectrum, locals, minima, include_edges, result)
         f'{"Local" if locals else "Global" } {"minima" if minima else "maxima"}' \
         f' were found incorrectly! ({"Including" if include_edges else "Excluding"} edges)'
 
-# @pytest.skip('Test when the csv support is added')
-# def test_reset(sample_spectra):
-#     sp = sample_spectra[randint(0, len(SPECTRA_PATHS) - 1)]
-#     path = sp.path
-#     data = sp.data[:]
-#     wavenums = sp.wavenums[:]
-#     assert all(data == sp.data) and data is not sp.data, 'Data copying problems!'
-#     assert all(wavenums == sp.wavenums) and wavenums is not sp.wavenums, 'WN copying problems!'
-#     sp += 4.
-#     sp += sp
-#     sp.wavenums = sp.wavenums[:-5]
-#     assert path == sp.path
-#     sp.reset()
-#     assert (data == sp.data).all() \
-#            and (wavenums == sp.wavenums).all(), \
-#         'The call of "reset" should turn spectrum\'s wavelengths and intensities to their original values!'
-
 
 @pytest.mark.parametrize('classify,recursive,result',
     [
         ('not classify', 'non recursive', (1, {'sample_spectra': 1})),
+        ('classify', 'non recursive', (3, {'first_class': 2, 'second_class': 1})),
         ('classify', 'non recursive', (3, {'first_class': 2, 'second_class': 1})),
         ('not classify', 'recursive', (5, {'sample_spectra': 5})),
         ('classify', 'recursive', (4, {'first_class': 2, 'second_class': 2})),
@@ -131,7 +115,7 @@ def test_read_data(classify, recursive, result):
 
 def test_init(sample_spectra):
     spc = sample_spectra[randint(0, len(sample_spectra) - 1)]
-    path, wavenums, data, clss = spc.path, spc.wavenums[:], spc.data[:], spc.clss
+    path, wavenums, data, clss = spc._path, spc.wavenums[:], spc.data[:], spc.clss
     test_spc = spc * 1.
     assert all(test_spc.data == spc.data)\
            and all(test_spc.wavenums == spc.wavenums) \
@@ -174,9 +158,21 @@ def test_read_csv(simplified_spectrum):
     os.remove(tmp_path)
 
 
+def test_reset():
+    sp_opus = spectrum.Spectrum(path='tests/sample_spectra/SD1.26')
+    sp_csv = spectrum.Spectrum(path='sample_spectra/diabetes_1.csv')
+    sp_w, sp_d = sp_opus.wavenums.copy(), sp_opus.data.copy()
+    csv_w, csv_d = sp_csv.wavenums.copy(), sp_csv.data.copy()
 
+    sp_csv += sp_csv * 3.
+    sp_csv.wavenums = sp_csv.wavenums[:23]
+    sp_opus.data = sp_csv.data
+    sp_opus.wavenums = sp_opus - 0.2
 
+    sp_csv.reset()
+    sp_opus.reset()
 
+    assert (sp_w == sp_opus.wavenums) and (sp_d == sp_opus.data), 'The opus reset went wrong!'
+    assert (csv_w == sp_csv.wavenums).all() and (csv_d == sp_csv.data).all(), 'The csv reset went wrong!'
 
-
-# def range(self, bigger, lesser)
+#def range(self, bigger, lesser)

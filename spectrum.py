@@ -14,12 +14,9 @@ from BaselineRemoval import BaselineRemoval
 from enums import NormMode, BaseLineMode, Scale
 import exceptions
 
-#add csv support for reset
 # add range
 # show specta - give intervals
-# Проверить, почему не работает rubberband
 # reader class common for spectrum and matrix?
-
 # interpolate
 # change size!!!
 
@@ -34,8 +31,8 @@ class Spectrum:
 
     def __init__(self, wavenums=None, data=None, path='', clss: str = 'undefined'):
         if wavenums is None:
-            wavenums, data = [], []
-        self.path = path
+            wavenums, data = np.array([], dtype=float), np.array([], dtype=float)
+        self._path = path
         if path and path.endswith('.csv'):
             self.wavenums, self.data, clss = Spectrum.read_csv(path)
         elif path:
@@ -47,8 +44,12 @@ class Spectrum:
 
         self.clss = clss
         Spectrum.spectrum_id += 1
-        self.id = Spectrum.spectrum_id
+        self.__id = Spectrum.spectrum_id
         self.step = abs(self.wavenums[1] - self.wavenums[0]) if len(self.wavenums) > 1 else 0
+
+    @property
+    def id(self):
+        return self.__id
 
     def __len__(self):
         return len(self.wavenums)
@@ -67,6 +68,15 @@ class Spectrum:
             yield self.wavenums[i], self.data[i]
 
     def range(self, bigger, lesser):
+        """
+        Create a new Spectrum limited by wavenumbers with the passed values.
+
+        params
+        bigger: float - The greater wavenumber value, cm-1
+        lesser: float - The lesser wavenumber value, cm-1
+
+        rtype: Spectrum
+        """
         start_ind = int((self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
         stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step) if lesser > self.wavenums[-1] else len(
             self)
@@ -91,6 +101,9 @@ class Spectrum:
         self.wavenums = self.wavenums[mask]
 
     def normalize(self, method=NormMode.VECTOR):
+        """
+        Normalize intensities values in-place.
+        """
         if method == NormMode.AREA:
             norm_coef = np.sum(self.data)
             self.data /= norm_coef
@@ -112,17 +125,42 @@ class Spectrum:
             self.data = baseline_rubberband(self.data, **kwargs)
 
     def atr_to_absorbace(self):
-        self.data = Spectrum.ATR_to_AB * self.data / self.wavenums
+        """
+        Recalculate the values of the spectrum from attenuated total reflectance to absorbance.
+        """
+        self.data = Spectrum.__ATR_to_AB * self.data / self.wavenums
 
     def smooth(self, method='savgol', **kwargs):
         # пока один метод сглаживания, но можно дописать другие
         self.data = savgol_filter(self.data, **kwargs)
 
-    def get_derivative(self, n=1, win_wight=13, order=5):
-        self.data = savgol_filter(
-            self.data, win_wight, polyorder=order, deriv=n)
+    def get_derivative(self, n=1, win_width=13, order=5):
+        """
+        Return the n-th derivative of intensity values array.
+
+        params
+        n: int - derivative order
+        win_width: int - the window size (only odd numbers are allowed).
+        order: the order of the polynomial used to approximate the derivative
+
+        rtype: numpy.ndarray(dtype=float)
+        """
+        if len(self) < 39:
+            win_width = len(self) // 2 + 1
+        if win_width % 2 != 1:
+            win_width += 1
+
+        return savgol_filter(
+            self.data, win_width, polyorder=order, deriv=n)
 
     def get_extrema(self, locals=True, minima=False, include_edges=False):
+        """
+        params
+        locals: bool - if True, return every local extrema specified, else only the global one.
+        minima: bool - if True, function searches for minima, else for maxima.
+        include_edges: bool - The edge points are suspicious, thus, their presence is at the user's discretion.
+        rtype: Tuple(List(indices), List(wavenumbers))
+        """
         indices = []
         wavenums = []
         iextr = 1
@@ -170,13 +208,16 @@ class Spectrum:
         '''
         Restore the values of wavenumbers and intensities according to the file in self.path.
         '''
-        self.wavenums, self.data = Spectrum.__read_opus(self.path)
+        if self._path.endswith('.csv'):
+            self.wavenums, self.data, _ = Spectrum.read_csv(self._path)
+        else:
+            self.wavenums, self.data = Spectrum.__read_opus(self._path)
 
     @classmethod
     def __two_op_spectra_operation(cls, self, other, op):
         s = deepcopy(self)
         Spectrum.spectrum_id += 1
-        s.id = Spectrum.spectrum_id
+        s.__id = Spectrum.spectrum_id
         if isinstance(other, (float, int)):
             s.data = Spectrum.__ops[op](self.data, other)
         elif isinstance(other, Spectrum):
@@ -223,9 +264,9 @@ class Spectrum:
         return Spectrum.__two_op_spectra_operation(self, other, '*')
 
     def __sub__(self, other):
-        '''
+        """
 		resulting spectrum inherits all the attributes of the first argument
-		'''
+		"""
         return Spectrum.__two_op_spectra_operation(self, other, '-')
 
     def __rsub__(self, other):
@@ -233,10 +274,11 @@ class Spectrum:
 
     def is_comparable(self, other):
         '''
+        Returns whether it is possible to compare two spectra value by value and to operate with them further.
+
         params:
         other: Spectrum
         rtype: bool
-        Returns whether it is possible to compare two spectra value by value and to operate with them further.
         '''
         return len(self) == len(other) \
                and self.wavenums[0] == other.wavenums[0] \
@@ -269,9 +311,9 @@ class Spectrum:
 
     @classmethod
     def read_csv(cls, path):
-        '''
+        """
         Read the only spectrum from the .csv file
-        '''
+        """
         with open(path, 'r') as csv:
             scale = csv.readline().split(',')
             scale_type, *scale = scale
@@ -287,6 +329,12 @@ class Spectrum:
             return scale, data, clss
 
     def save_as_csv(self, path, scale_type=Scale.WAVENUMBERS):
+        """
+        Saves the file in csv format with the specified scale.
+        params
+        path: str - path to the destination file
+        scale_type: Scale
+        """
         if scale_type == Scale.WAVELENGTH_nm:
             scale = 10_000_000. / self.wavenums
         elif scale_type == Scale.WAVELENGTH_um:
@@ -300,7 +348,15 @@ class Spectrum:
     def interpolate(self):
         pass
 
+
 def scale_change(scale_type):
+    """
+    Define the function of wavenumbers recalculation.
+    params
+    scale_type: Scale - determines the scale units
+
+    rtype: (str|float,) -> float
+    """
     if scale_type == Scale.WAVELENGTH_nm:
          return lambda x: 10_000_000. / float(x)
     elif scale_type == Scale.WAVELENGTH_um:
@@ -308,7 +364,12 @@ def scale_change(scale_type):
     else:
         return lambda x: float(x) / 1.
 
+
 def spectra_log(spectra_dict, path='log.txt'):
+    """
+    Types the spectra collection into the file by path.
+
+    """
     with open(path, 'w') as f:
         for spc in spectra_dict:
             print(spectra_dict[spc], file=f)
@@ -333,14 +394,35 @@ def baseline_alss(y, lam=1e6, p=1e-3, niter=10):
 
 
 def rubberband(x, y):
-    # Find the convex hull
-    v = ConvexHull(np.vstack((x, y)).T).vertices
-    # Rotate convex hull vertices until they start from the lowest one
-    v = np.roll(v, v.argmax())
-    # Leave only the ascending part
-    v = v[:v.argmax()]
-    # Create baseline using linear interpolation between vertices
-    return y - np.interp(x, x[v], y[v])
+    plt.figure()
+    base = ConvexHull(list(zip(x, y))).vertices
+    # print(base)
+    # base = np.roll(base, -base.argmin() - 1)
+    # base = base[base.argmax():]
+    base = np.roll(base, -base.argmax() - 1)
+    base1 = base[base.argmin():]
+    base2 = base[:base.argmin() + 1]
+    # print(base1, base2)
+    # print('base1' if y[base1[1]] < y[base2[1]] else 'base2')
+    base1 = list(base1 if y[base1[1]] < y[base2[1]] else base2)
+    base1 =  [len(x) - 1] + base1 + [0]
+    # plt.plot(x, np.interp(x, x[base1], y[base1]), color='k')
+    # print(x[base])
+    # plt.plot(x[base1], y[base1], 'b--')
+    # print(x[base1])
+    new_y = y - np.interp(x, x[base1], y[base1])
+    # plt.plot(x, new_y, color='g')
+    # plt.show()
+    return x, new_y
+
+    # # Find the convex hull
+    # v = ConvexHull(np.vstack((x, y)).T).vertices
+    # # Rotate convex hull vertices until they start from the lowest one
+    # v = np.roll(v, v.argmax())
+    # # Leave only the ascending part
+    # v = v[:v.argmax()]
+    # # Create baseline using linear interpolation between vertices
+    # return y - np.interp(x, x[v], y[v])
 
 
 def baseline_rubberband(y):
@@ -391,6 +473,15 @@ def baseline_zhang(y, polynomial_degree=2):
 
 
 def get_spectra_list(**kwargs):
+    """
+    params
+    path: str = 'data' - path to the root directory of spectra. If not defined, the path is the current directory
+    classify: bool = False - if True, the classes are defined as the first-layer directory name;
+    or paths aren't included in case they're in the root directory, else all paths are marked as '.'
+    recursive: bool = False - if True, explores all the nested directories,
+    else is limited with only 0,1-level directories
+    rtype: List(Spectrum)
+    """
     res = []
     for p, clss in read_data(**kwargs):
         res.append(Spectrum(path=p, clss=clss))
@@ -398,6 +489,16 @@ def get_spectra_list(**kwargs):
 
 
 def get_spectra_dict(**kwargs):
+    """
+    Returns the dictionary: keys are spectra IDs and Spectrum objects as values.
+    params
+    path: str = 'data' - path to the root directory of spectra. If not defined, the path is the current directory
+    classify: bool = False - if True, the classes are defined as the first-layer directory name;
+    or paths aren't included in case they're in the root directory, else all paths are marked as '.'
+    recursive: bool = False - if True, explores all the nested directories,
+    else is limited with only 0,1-level directories
+    rtype: Dict(int: Spectrum)
+    """
     res = {}
     for p, clss in read_data(**kwargs):
         s = Spectrum(path=p, clss=clss)
@@ -407,13 +508,11 @@ def get_spectra_dict(**kwargs):
 
 def read_data(path='data', classify=False, recursive=False):
     '''
-    params: path: str = 'data'
-    path to the root directory of spectra. If not defined, the path is the current directory
-    params: classify: bool = False
-    if True, the classes are defined as the first-layer directory name; or paths aren't included in case they're in the root directory.
-    else all paths are marked as '.'
-    params: recursive: bool = False
-    if True, explores all the nested directories, else is limited with only 0,1-level directories
+    path: str = 'data' - path to the root directory of spectra. If not defined, the path is the current directory
+    classify: bool = False - if True, the classes are defined as the first-layer directory name;
+    or paths aren't included in case they're in the root directory, else all paths are marked as '.'
+    recursive: bool = False - if True, explores all the nested directories,
+    else is limited with only 0,1-level directories
 	rtype: List[Tuple(path: str, class: str)]
 	'''
     paths = []
@@ -447,6 +546,12 @@ def read_data(path='data', classify=False, recursive=False):
 
 
 def filter_opus(path):
+    """
+    Check whether the file is a valid opus one.
+    params:
+    path: str - the path to the destination file
+    rtype: bool
+    """
     ext = path[path.rfind('.') + 1:]
     if not ext.isdigit():
         return False
@@ -461,6 +566,8 @@ def filter_opus(path):
 def show_spectra(spectra, save_path='', wavenumbers=None):
     if not spectra:
         return
+    if isinstance(spectra, Spectrum):
+        spectra = [spectra]
     classes = list(sorted(set(map(lambda x: x.clss, spectra))))
     colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
     colors = dict(zip(classes, colors))
@@ -487,45 +594,56 @@ def show_spectra(spectra, save_path='', wavenumbers=None):
 
 if __name__ == '__main__':
     print('HI')
-    with open('ex.csv', 'r') as f:
-        plt.figure()
-        f.readline()
-        for line in f.readlines():
-            values = [float(i) for i in line.strip().split(',')[1:]]
-            plt.plot(values)
-        plt.show()
+    # spc = Spectrum(wavenums=np.array(list(range(1, 11)), dtype=float),
+    #                          data=np.array([
+    #                              -10., -7., 4., -8., -6., 2., 3., 2., 7., 6.
+    #                          ]))
 
-    # spa = get_spectra_list(recursive=False, classify=True)
-    # sp = spa[0]
-    # print(sp.wavenums)
-    # sp1 = sp.wavenums[:]
-    # print(sp1 is sp.wavenums)
-    # print(sp1 == sp.wavenums)
+    #plt.figure()
+    spa = get_spectra_list(path='data', classify=True)
+    show_spectra(spa[:10])
+    # spa = [spc]
+    # spc1 = spc * 1
+    # spc1.data = np.exp( -1. / spc1.data)
+    # spa.append(spc1)
+    # spc2 = spc * 1
+    # spc2.atr_to_absorbace()
+    # spa.append(spc2)
+    # show_spectra(spa)
+
+    # for i, spc in enumerate(spa):
+    #     spc.wavenums, spc.data = rubberband(spc.wavenums, spc.data)
+    #     print(i)
+    #     plt.figure()
+    #     plt.plot(spc.wavenums, spc.data)
+    #     plt.show()
+
+    # show_spectra(spa)
+    #plt.show()
+    # plt.figure()
+    # plt.plot(spc.wavenums, spc.data)
+    # x = ConvexHull(list(iter(spc))).vertices
+    # x = np.roll(x, -x.argmin()) # min at 0
+    # # for i in x:
+    # #     plt.axvline(spc.wavenums[i])
+    # # x = x[:x.argmax() + 1]
+    # print(x)
+    # x = x[x.argmax() + 1:]
+    #
+    # print(*[spc.wavenums[i] for i in x])
+    # y = spc.data[x]
+    # w = spc.wavenums[x]
+    #
+    # plt.plot(w, y)
+    # plt.plot(spc.wavenums, np.interp(spc.wavenums, spc.wavenums[x], y))
+    # new_y = spc.data - np.interp(spc.wavenums, spc.wavenums[x], y)
+    # plt.plot(spc.wavenums, new_y)
+    #
+    # # plt.plot(*rubberband(spc.wavenums, spc.data))
+    # plt.show()
 
 
-    import test
-    # s1 = Spectrum(wavenums=list(range(6)), data=list(range(6)))
-    # s2 = Spectrum(wavenums=list(range(6)), data=list(range(-5, 1)))
-    # print(s1.data)
-    # print(s2.data)
-    # s = s1 + s2
-    # print(s)
-    # f = opus.read_file(r'C:\Users\user\PycharmProjects\spectrum\SD10.30')
-    # print(*[it for it in f.items()], sep='\n\n')
-    # sp = get_spectra_list(
-    #     recursive=False)[:2]
-    # sp[0] *= 1
-    # show_spectra(sp)
 
-# sp = sp.range(4000, 2578)
-# sp = get_spectra_list(
-# 	path='Спектры сывороток животных/Черепаха raw', recursive=False)[0]
-# spca = get_spectra_dict(path=r'Спектры сывороток животных/Черепаха raw', recursive=False)
-# spectra_log(spca)
-# sp_rb = sp * 1
-# sp_rb.correct_baseline()
-# sp_rb.clss = 'RB correction'
-# show_spectra([sp, sp_rb])
 
-# sp.reset()
-# show_spectra([sp])
+
+
