@@ -1,7 +1,9 @@
 import numpy as np
 import spectrum as sp
 from scipy.stats import mode
-from enums import Scale
+from enumerations import Scale
+from scan import get_spectra_list, get_spectra_dict
+from output import scale_change
 
 class Matrix():
     def __init__(self, spectra):
@@ -53,7 +55,7 @@ class Matrix():
         if not self.spectra:
             return
         sc = self.spectra[0]
-        f = sp.scale_change(scale_type)
+        f = scale_change(scale_type)
         scale = list(map(f, sc.wavenums))
         with open(path, 'w') as out:
             print(scale_type.value, *scale, sep=',', file=out)
@@ -63,7 +65,7 @@ class Matrix():
 
 if __name__ == '__main__':
     print('HI')
-    spa = sp.get_spectra_list(classify=True, recursive=True)
+    spa = get_spectra_list(classify=True, recursive=True)
     mtr = Matrix(spa)
     # mtr.save_matrix()
     spa = Matrix.read_csv('matrix.csv')

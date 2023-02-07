@@ -1,7 +1,7 @@
 from spectrum import Spectrum
 import numpy as np
 import matplotlib.pyplot as plt
-from enums import Scale
+from enumerations import Scale
 
 def show_spectra(spectra, save_path='', wavenumbers=None):
     if not spectra:

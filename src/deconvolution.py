@@ -2,18 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from scipy.optimize import minimize
-from spectrum import Spectrum, show_spectra
-from enums import LossFunc
+from spectrum import Spectrum
+from output import show_spectra
+from enumerations import LossFunc
 from random import random
 
 
-def gauss(x, mu, sigma):
-    return 1./sigma/np.sqrt(2.*np.pi) * np.exp(-0.5 * ((x - mu) / sigma)**2)
+def gauss(x, amp, mu, sigma):
+    return amp / sigma / np.sqrt(2.*np.pi) * np.exp(-0.5 * ((x - mu) / sigma)**2)
 
-def lorentz(x, x0, gamma):
-    return 1./np.pi/gamma * (gamma**2 / (gamma**2 + (x - x0)**2))
+def lorentz(x, amp, x0, gamma):
+    return amp / np.pi / gamma * (gamma**2 / (gamma**2 + (x - x0)**2))
 
-
+def voigt(x, amp, x0, w, gauss_prop):
+    assert 0 <= gauss_prop <= 1
+    return gauss_prop * gauss(x, amp, x0, w) + (1 - gauss_prop) * lorentz(x, amp, x0, w)
 
 class Deconvolutor:
 
@@ -59,7 +62,7 @@ class Deconvolutor:
     def __approximation(self, params_vector):
         approx_data = np.zeros(len(self.spectrum))
         for a, m, s in zip(*Deconvolutor.__split_params(params_vector)):
-            approx_data += a * Deconvolutor.distribution()(self.spectrum.wavenums, m, s)
+            approx_data += Deconvolutor.distribution()(self.spectrum.wavenums, a, m, s)
         return approx_data
 
     @classmethod
@@ -88,15 +91,20 @@ class Deconvolutor:
 #
 if __name__ == '__main__':
     print('Hi')
-    wavenums = np.arange(4000., 600., -0.9367)
-    data = 1.5 * gauss(wavenums, 2567, 100) + gauss(wavenums, 1230, 200) * 2 + gauss(wavenums, 840, 29)
-    spc = Spectrum(wavenums, data)
-    dcv = Deconvolutor(spc)
-    approx = np.zeros(len(spc))
-    for a, m, s in dcv.deconvolute():
-        approx += a * gauss(spc.wavenums, m, s)
-    approx = Spectrum(spc.wavenums, approx, clss='app')
-    show_spectra([approx, spc])
+    amp, m, w = 3., 1., 0.5
+    x = np.arange(-3., 4., 0.01)
+    #print(voigt(x, amp, m, w, 0.5))
+    plt.figure(figsize=(7, 9))
+    plt.xlim((-3., 4.))
+    # plt.plot(x, voigt(x, amp, m, w, 0.5))
+    g = gauss(x, amp, m, w)
+    l = lorentz(x, amp, m, w)
+    plt.plot(x, g, 'g', label='gauss')
+    plt.plot(x, l, 'b', label='lorentz')
+    for i in np.arange(.1, .9, .1):
+        plt.plot(x, voigt(x, amp, m, w, i), label=f'voigt {np.round(i, 1)}')
+    plt.legend()
+    plt.show()
     # print(*[i for i in dcv.deconvolute()], sep='\n')
 
 

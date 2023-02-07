@@ -1,6 +1,5 @@
 from enum import Enum
 import numpy as np
-
 class NormMode(Enum):
     VECTOR = 'vector'
     AREA = 'area'

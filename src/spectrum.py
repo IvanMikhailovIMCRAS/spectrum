@@ -1,19 +1,20 @@
 from copy import deepcopy
 import numpy as np
-import os
-import matplotlib.pyplot as plt
+# import os
+# import matplotlib.pyplot as plt
 import brukeropusreader as opus
-from random import sample
-import logging
-from scipy import sparse
-from scipy.sparse.linalg import spsolve
-from scipy.spatial import ConvexHull
-from scipy.linalg import cholesky
+# from random import sample
+# import logging
+# from scipy import sparse
+# from scipy.sparse.linalg import spsolve
+# from scipy.spatial import ConvexHull
+# from scipy.linalg import cholesky
 from scipy.signal import savgol_filter
 #from BaselineRemoval import BaselineRemoval
-from enums import NormMode, BaseLineMode, Scale
-import exceptions
-from baseline import baseline_alss, baseline_zhang, baseline_rubberband
+from src.enumerations import NormMode, BaseLineMode, Scale
+from src.exceptions import SpcCreationEx
+
+from src.baseline import baseline_alss, baseline_zhang, baseline_rubberband
 
 
 # add range
@@ -42,7 +43,7 @@ class Spectrum:
         elif len(wavenums) == len(data) != 0:
             self.wavenums, self.data = wavenums, data
         else:
-            raise exceptions.SpcCreationEx
+            raise SpcCreationEx
 
         self.clss = clss
         Spectrum.spectrum_id += 1

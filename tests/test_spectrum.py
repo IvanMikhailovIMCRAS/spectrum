@@ -1,11 +1,25 @@
-import os
 import sys
+import os
 import numpy as np
 import pytest
-from src.enums import Scale
-import src.exceptions
-import src.spectrum
+
+sys.path.append(os.path.abspath(f'..\\src'))
+
+# from enumerations import Scale
+# import exceptions as exceptions
+# import spectrum as spectrum
+# from random import randint
+# from filter import filter_opus
+# from scan import read_data
+# from output import scale_change
+from src.enumerations import Scale
+import src.exceptions as exceptions
+import src.spectrum as spectrum
 from random import randint
+from src.filter import filter_opus
+from src.output import scale_change
+print(sys.path)
+
 SPECTRA_PATHS = [
         'sample_spectra/first_class/SD4.17', 'sample_spectra/first_class/SD6.20',
         'sample_spectra/second_class/SD7.17', 'sample_spectra/second_class/nested_class/SD9.60'
@@ -15,15 +29,6 @@ __OPS = {
         '-': lambda x, y: x - y,
         '*': lambda x, y: x * y
     }
-
-
-
-def test_filter_opus():
-    assert spectrum.filter_opus('sample_spectra/SD1.26'), 'Opus files should be available!'
-    assert not spectrum.filter_opus('sample_spectra/garbage.txt'),\
-        'Files with not digit-like extention must be filtered off!'
-    assert not spectrum.filter_opus('sample_spectra/broken_file.21'),\
-        'Only binary undamaged files are allowed!'
 
 
 @pytest.fixture(scope='module')
@@ -94,27 +99,10 @@ def test_get_extrema(simplified_spectrum, locals, minima, include_edges, result)
         f'{"Local" if locals else "Global" } {"minima" if minima else "maxima"}' \
         f' were found incorrectly! ({"Including" if include_edges else "Excluding"} edges)'
 
-
-@pytest.mark.parametrize('classify,recursive,result',
-    [
-        ('not classify', 'non recursive', (1, {'sample_spectra': 1})),
-        ('classify', 'non recursive', (3, {'first_class': 2, 'second_class': 1})),
-        ('classify', 'non recursive', (3, {'first_class': 2, 'second_class': 1})),
-        ('not classify', 'recursive', (5, {'sample_spectra': 5})),
-        ('classify', 'recursive', (4, {'first_class': 2, 'second_class': 2})),
-    ]
-)
-def test_read_data(classify, recursive, result):
-    res = spectrum.read_data('sample_spectra', classify=(classify == 'classify'), recursive=(recursive == 'recursive'))
-    assert len(res) == result[0], 'The selection went wrong!'
-    d = {}
-    for i in res:
-        d[i[1]] = d.get(i[1], 0) + 1
-    assert d == result[1], 'The classification went wrong!'
-
-
-def test_init(sample_spectra):
-    spc = sample_spectra[randint(0, len(sample_spectra) - 1)]
+@pytest.mark.parametrize('spc', SPECTRA_PATHS)
+def test_init(spc):
+    # spc = sample_spectra[randint(0, len(sample_spectra) - 1)]
+    spc = spectrum.Spectrum(path=spc)
     path, wavenums, data, clss = spc._path, spc.wavenums[:], spc.data[:], spc.clss
     test_spc = spc * 1.
     assert all(test_spc.data == spc.data)\
@@ -139,7 +127,7 @@ def test_save_as_csv(simplified_spectrum, scale_type):
     with open(tmp_path, 'r') as file:
         f_line = file.readline().strip()
         s_line = file.readline().strip()
-        f = spectrum.scale_change(scale_type)
+        f = scale_change(scale_type)
         scale = [str(f(i)) for i in simplified_spectrum.wavenums]
         expected_first_line = ','.join([scale_type.value] + scale)
         expected_second_line = ','.join([simplified_spectrum.clss] + [str(i) for i in simplified_spectrum.data])
@@ -159,7 +147,7 @@ def test_read_csv(simplified_spectrum):
 
 
 def test_reset():
-    sp_opus = spectrum.Spectrum(path='tests/sample_spectra/SD1.26')
+    sp_opus = spectrum.Spectrum(path='sample_spectra/SD1.26')
     sp_csv = spectrum.Spectrum(path='sample_spectra/diabetes_1.csv')
     sp_w, sp_d = sp_opus.wavenums.copy(), sp_opus.data.copy()
     csv_w, csv_d = sp_csv.wavenums.copy(), sp_csv.data.copy()
@@ -172,7 +160,7 @@ def test_reset():
     sp_csv.reset()
     sp_opus.reset()
 
-    assert (sp_w == sp_opus.wavenums) and (sp_d == sp_opus.data), 'The opus reset went wrong!'
+    assert (sp_w == sp_opus.wavenums).all() and (sp_d == sp_opus.data).all(), 'The opus reset went wrong!'
     assert (csv_w == sp_csv.wavenums).all() and (csv_d == sp_csv.data).all(), 'The csv reset went wrong!'
 
 #def range(self, bigger, lesser)
