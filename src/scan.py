@@ -1,4 +1,4 @@
-from spectrum import Spectrum
+from src.spectrum import Spectrum
 import os
 from filter import filter_opus
 
