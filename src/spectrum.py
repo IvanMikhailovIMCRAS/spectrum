@@ -11,10 +11,9 @@ import brukeropusreader as opus
 # from scipy.linalg import cholesky
 from scipy.signal import savgol_filter
 #from BaselineRemoval import BaselineRemoval
-from src.enumerations import NormMode, BaseLineMode, Scale
-from src.exceptions import SpcCreationEx
-
-from src.baseline import baseline_alss, baseline_zhang, baseline_rubberband
+from enumerations import NormMode, BaseLineMode, Scale
+from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx
+from baseline import baseline_alss, baseline_zhang, baseline_rubberband
 
 
 # add range
@@ -227,7 +226,7 @@ class Spectrum:
             if self.is_comparable(other):
                 s.data = Spectrum.__ops[op](self.data, other.data)
             else:
-                raise exceptions.SpcChangeEx
+                raise SpcChangeEx
         else:
             raise TypeError
         return s
@@ -240,7 +239,7 @@ class Spectrum:
             if self.is_comparable(other):
                 self.data = Spectrum.__ops[op](self.data, other.data)
             else:
-                raise exceptions.SpcChangeEx
+                raise SpcChangeEx
         else:
             raise TypeError
         return self
@@ -305,7 +304,7 @@ class Spectrum:
             file = opus.read_file(path)
             x = file.get_range()
             y = file['AB']
-        except exceptions.SpcReadingEx as err:
+        except SpcReadingEx as err:
             pass
         finally:
             if len(x) > 1:

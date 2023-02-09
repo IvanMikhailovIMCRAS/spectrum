@@ -13,8 +13,10 @@ def get_spectra_list(**kwargs):
     rtype: List(Spectrum)
     """
     res = []
-    for p, clss in read_data(**kwargs):
-        res.append(Spectrum(path=p, clss=clss))
+    read = read_data(**kwargs)
+    if read:
+        for p, clss in read:
+            res.append(Spectrum(path=p, clss=clss))
     return res
 
 
@@ -30,9 +32,11 @@ def get_spectra_dict(**kwargs):
     rtype: Dict(int: Spectrum)
     """
     res = {}
-    for p, clss in read_data(**kwargs):
-        s = Spectrum(path=p, clss=clss)
-        res[s.id] = s
+    read = read_data(**kwargs)
+    if read:
+        for p, clss in read:
+            s = Spectrum(path=p, clss=clss)
+            res[s.id] = s
     return res
 
 
