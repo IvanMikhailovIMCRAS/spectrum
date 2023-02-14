@@ -8,17 +8,17 @@ from enumerations import LossFunc
 from random import random
 import statsmodels.api as sm
 
-
-
-width_sigma = 2 * np.sqrt(np.log(2)) #* np.sqrt(2)
+width_sigma = 2 * np.sqrt(np.log(2))  # * np.sqrt(2)
 width_lambda = 2.
+
 
 # def gauss(x, amp, mu, sigma):
 #     return amp / sigma / np.sqrt(2.*np.pi) * np.exp(-0.5 * ((x - mu) / sigma)**2)
 
 def gauss(x, amp, mu, w):
-    sigma =  w / width_sigma
+    sigma = w / width_sigma
     return amp * np.exp(-np.square((x - mu) / sigma))
+
 
 def lorentz(x, amp, x0, w):
     return amp / (np.square(2 * (x - x0) / w) + 1.)
@@ -28,8 +28,8 @@ def voigt(x, amp, x0, w, gauss_prop):
     assert 0 <= gauss_prop <= 1
     return gauss_prop * gauss(x, amp, x0, w) + (1 - gauss_prop) * lorentz(x, amp, x0, w)
 
-class Deconvolutor:
 
+class Deconvolutor:
     def __init__(self, spectrum, loss_func=LossFunc.RMSE, threshold=0.01):
         self.spectrum = spectrum * 1
         self.threshold = threshold
@@ -49,10 +49,10 @@ class Deconvolutor:
         # approx_data = np.zeros(len(data))
         # for a, m, s in zip(ams, mus, sigmas):
         #     approx_data += a * gauss(wavenums, m, s)
-        return self.loss_func(self.spectrum.data, self.__approximation(v)) # np.sum(np.square(data - approx_data))
+        return self.loss_func(self.spectrum.data, self.__approximation(v))  # np.sum(np.square(data - approx_data))
 
     def deconvolute(self):
-        #spc = Spectrum()
+        # spc = Spectrum()
         # plt.figure()
         spc = self.spectrum * 1
         # plt.plot(self.spectrum.wavenums, self.spectrum.data, 'b')
@@ -65,7 +65,7 @@ class Deconvolutor:
         self.minima = list(indices)
         # print('Indices: ', self.minima)
         initial_params = self.__init_params()
-        res = minimize(self.loss, #lambda x: self.loss(x, data=self.spectrum.data),
+        res = minimize(self.loss,  # lambda x: self.loss(x, data=self.spectrum.data),
                        initial_params, method='Nelder-Mead', tol=1e-6).x
         return zip(*Deconvolutor.__split_params(res))
 
@@ -98,10 +98,11 @@ def create_spectrum(x, params):
         data += voigt(x, amp, mu, w, g)
     return Spectrum(wavenums=x, data=data)
 
+
 if __name__ == '__main__':
     print('Hi')
-    x = np.arange(400., 12500., 0.093)
-    
+    # x = np.arange(400., 12500., 0.093)
+    #
     params = [
         (3.0, 2567., 560., 0.3),
         (3.5, 3245., 123., 0.8),
@@ -111,21 +112,20 @@ if __name__ == '__main__':
         (0.5, 10532., 380., 0.1)
     ]
     sp = create_spectrum(x, params)
-    # sp.data += np.random.normal(loc=0, scale=sp.std * 0.01, size=(len(x),))
-    sp2 = sp * 1
-    # sp.data = sp.get_derivative(n=2)
-    # d = sm.nonparametric.lowess(sp2.data, sp2.wavenums, frac=0.10, delta=15, it=3)
-    # sp2.data, sp2.wavenums = d[::-1, 1], d[::-1, 0]
-    sp.clss= 'smoothed'
-    sp2.data = sp2.get_derivative(n=2)
-    plt.plot(x, sp2.data)
-    plt.show()
-    # show_spectra()
-    
-    
-    
+    # # sp.data += np.random.normal(loc=0, scale=sp.std * 0.01, size=(len(x),))
+    # sp2 = sp * 1
+    # # sp.data = sp.get_derivative(n=2)
+    # # d = sm.nonparametric.lowess(sp2.data, sp2.wavenums, frac=0.10, delta=15, it=3)
+    # # sp2.data, sp2.wavenums = d[::-1, 1], d[::-1, 0]# d = sm.nonparametric.lowess(sp2.data, sp2.wavenums, frac=0.10, delta=15, it=3)
+    # # sp2.data, sp2.wavenums = d[::-1, 1], d[::-1, 0]
+    # sp.clss = 'smoothed'
+    # sp2.data = sp2.get_derivative(n=2)
+    # plt.plot(x, sp2.data)
+    # plt.show()
+    # # show_spectra()
+
     # plt.figure()
-    # x = np.arange(-0.5, 0.5, 0.01)
+    # x = np.arange(-4.5, 4.5, 0.01)
     # w, amp, mu = 1., 3., 0.
     # gau = gauss(x, amp, mu, w)
     # lor = lorentz(x, amp, mu, w)
@@ -141,7 +141,7 @@ if __name__ == '__main__':
     # plt.plot(x, voi, label='voigt')
     # plt.legend()
     # plt.show()
-    
+
     # print(width_sigma)
     # amp, m, w = 3., 1., 0.5
     # x = np.arange(-3., 4., 0.01)
@@ -158,5 +158,4 @@ if __name__ == '__main__':
     # plt.legend()
     # plt.show()
     # # print(*[i for i in dcv.deconvolute()], sep='\n')
-
 
