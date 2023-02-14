@@ -1,15 +1,35 @@
 from scipy.signal import savgol_filter, wiener, sosfilt, spline_filter, deconvolve
-from scipy.fft import fft, ifft, fftshift, fftfreq
 from enumerations import LossFunc, NormMode, BaseLineMode
 import numpy as np
+from numpy.fft import fft, ifft, fftshift
 import matplotlib.pyplot as plt
-from scan import get_spectra_list
+from scan import get_spectra_list, read_columns
 from scipy.stats import mode
 from output import show_spectra
 import os
 import cv2
 import statsmodels.api as sm
 from spectrum import Spectrum
+import time
+from tqdm import tqdm
+
+
+class Smoother:
+    #methods = [savgol, moving_average, ]
+    @staticmethod
+    def param_gen(param):
+        names = list(param)
+        res = {}
+
+        def choose_one(i):
+            for val in param[names[i]]:
+                res[names[i]] = val
+                if i == len(names) - 1:
+                    yield res
+                else:
+                    yield from choose_one(i + 1)
+
+        yield from choose_one(0)
 
 def savgol(data, window_length=7, order=5):
     return savgol_filter(data, window_length=window_length, polyorder=order)
@@ -64,72 +84,122 @@ def Fourier_filter(y, l, h):
     plt.plot(y, label='F')
     plt.show()
 
-def lowess_frac(spc):
-    res = []
-    frs = []
-    for fr in np.arange(0.8, 1., 0.01):
-        # fr = 1. / i
-        frs.append(fr)
-        data = sm.nonparametric.lowess(spc.wavenums, spc.data, frac=fr, return_sorted=False)
-        res.append(LossFunc.RMSE(data, spc.data))
-    # plt.plot(spc.wavenums, res[0], label='0')
-    # plt.plot(spc.wavenums, res[1], label='1')
-    plt.plot(frs, res)
-    plt.legend()
+
+#
+# def lowess_params_grid(spc, deltas, fracs, iters,
+#                        path='lowess_report.csv',
+#                        delimiter=','):
+#     headers = ['delta', 'frac', 'iter', 'peaksnumber', 'comptime']
+#     with open(path, 'w') as out:
+#         out.write(delimiter.join(headers) + '\n')
+#         for delta in tqdm(deltas):
+#             for frac in tqdm(fracs):
+#                 for iter in iters:
+#                     cursp = spc * 1
+#                     line = [str(int(delta)), str(np.round(frac, 3)), str(iter),]
+#                     t1 = time.time()
+#                     d = sm.nonparametric.lowess(spc.data, spc.wavenums, frac=frac, delta=delta, it=iter)
+#                     t2 = time.time()
+#                     cursp.data = d[::-1, 1]
+#                     cursp.data = spc.get_derivative(n=2)
+#                     line.append(str(len(cursp.get_extrema(minima=True, locals=True, include_edges=False)[1])))
+#                     line.append(str(t2 - t1))
+#                     out.write(delimiter.join(line) + '\n')
+
+def lowess_params_grid_compare(spc, spc_ideal, prng,
+                       path='lowess_report.csv',
+                       delimiter=',',
+                       loss=LossFunc.RMSE):
+    headers = list(prng) + ['peaks', 'comptime', 'loss']
+    with open(path, 'w') as out:
+        out.write(delimiter.join(headers) + '\n')
+        for params in tqdm(Smoother.param_gen(prng)):
+            line = [str(np.round(params[param], 3) for param in params)]
+            cursp = spc * 1
+            t1 = time.time()
+            d = sm.nonparametric.lowess(spc.data, spc.wavenums, **params)
+            t2 = time.time()
+            cursp.data = d[::-1, 1]
+            cursp.data = spc.get_derivative(n=2)
+            line.append(str(len(cursp.get_extrema(minima=True, locals=True, include_edges=False)[1])))
+            line.append(str(t2 - t1))
+            line.append(str(loss(cursp.data, spc_ideal.data)))
+            out.write(delimiter.join(line) + '\n')
+
+def fourier(spc, thr, size):
+    y = spc.data
+    y = fft(y)
+    level = thr * np.max(y.real)
+    y[y < level] = 0
+    y[int(len(y) * size):] = 0
+    assert len(spc) == len(ifft(y))
+    return ifft(y)
+
+def peaks_losses(noised, ideal, smooth, config: dict, iterby: str, loss=LossFunc.RMSE):
+    real_peaks_number = len(ideal.get_extrema(minima=False, locals=True)[0])
+    losses = [0]
+    peaks = [len(noised.get_extrema(minima=False, locals=True)[0])]
+    addspc = noised * 1
+    prms = [0] + config[iterby]
+    for prm in Smoother.param_gen(config):
+        y = smooth(noised.data, **prm)
+        addspc.data = y
+        peaks.append(len(addspc.get_extrema(minima=False, locals=True)[0]))
+        losses.append(loss(y, ideal.data))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    ax1.plot(prms, losses)
+    ax1.set_title('Losses')
+    ax2.plot(prms, peaks)
+    ax2.set_title('Peak number')
+    ax2.axhline(real_peaks_number, color='r')
+
+    # fig.savefig(r"C:\Users\user\Desktop\pl.png")
     plt.show()
-
-methods = [savgol, moving_average, ]
-
-
-def iter_methods(spc, methods, lossfunc, n_iter=1):
-    print(f'method', *[i.__name__ for i in methods], sep='\t'*3)
-
-    data = [spc.data[:] for i in methods]
-    for i in range(1, n_iter + 1):
-        line = [i]
-        for j, method in enumerate(methods):
-            try:
-                data[j] = method(data[j])
-                line.append(str(lossfunc(spc.data, data[j])))
-            except:
-                line.append('###')
-        print(*line, sep='\t'*3)
 
 
 if __name__ == '__main__':
     print('Hi!')
-    spc = get_spectra_list(path='../data', classify=True, recursive=True)[67]
-    iter_methods(spc, methods, LossFunc.RMSE, 3)
+    spc = get_spectra_list(path='../data', classify=True, recursive=True)[127]
+    noised = spc + np.random.normal(loc=0, scale=spc.std * 0.01, size=(len(spc),))
+    print(len(spc.get_extrema(minima=False, locals=True)[0]))
+    # print(len(noised.get_extrema(minima=False, locals=True)[0]))
+    noised.clss = 'noised'
+    show_spectra([spc, noised])
+    peaks_losses(noised, spc, moving_average,
+                 config={'window': list(range(1, 125, 2))},
+                 iterby='window')
 
-    # iterative_smoothing(spc.data, sm.nonparametric.lowess, 1,
-    #                     show_smoothed=True, lossfunc=LossFunc.RMSE, return_sorted=False, exog=spc.wavenums)
-    # res = list(zip(*sm.nonparametric.lowess(spc.data, spc.wavenums)))
-    # print(*res, sep='\n')
-    # res = []
-    # frs = []
-    # for fr in np.arange(0.8, 1., 0.01):
-    #     # fr = 1. / i
-    #     frs.append(fr)
-    #     data = sm.nonparametric.lowess(spc.wavenums, spc.data, frac=fr, return_sorted=False)
-    #     res.append(LossFunc.RMSE(data, spc.data))
-    # # plt.plot(spc.wavenums, res[0], label='0')
-    # # plt.plot(spc.wavenums, res[1], label='1')
-    # plt.plot(frs, res)
+
+
+    # spc = get_spectra_list(path='../data', classify=True, recursive=True)[127]
+    # print('Original peaks number ', len(spc.get_extrema(minima=False, locals=True)[0]))
+    # spc += np.random.normal(loc=0, scale=spc.std * 0.01, size=(len(spc),))
+    # losses = [0]
+    # peaks = [len(spc.get_extrema(minima=False, locals=True)[0])]
+    # wndws = list(range(1, 12, 2))
+    # cur = spc * 1
+    # for w in wndws:
+    #     cur.data = moving_average(spc.data, w)
+    #     peaks.append(len(cur.get_extrema(minima=True, locals=True)[0]))
+    #     losses.append(LossFunc.RMSE(cur.data, spc.data))
+    #
+    # plt.plot([0] + wndws, peaks,)
     # plt.legend()
     # plt.show()
-    # Fourier_filter(spc.data, 0.95, 0.95)
-
-
-    # sp2 = Spectrum(data= sm.nonparametric.lowess(spc.wavenums, spc.data, frac=0.93, return_sorted=False),
-    #                wavenums=spc.wavenums, clss='approx')
-    # spc.normalize(NormMode.MINMAX)
-    # sp2.normalize(NormMode.MINMAX)
-    # sp2.correct_baseline(BaseLineMode.ALSS)
-    # spc.correct_baseline(BaseLineMode.ALSS)
-    # show_spectra([sp2, spc])
-
-    # plt.plot(spc.wavenums, spc.data, label='data')
-    # plt.plot(spc.wavenums, data, label='approx')
-    # plt.legend()
+    # plt.plot([0] + wndws, losses)
     # plt.show()
+
+
+    # spc = get_spectra_list(path='../data', classify=True, recursive=True)[127]
+    # spc_ideal = spc * 1
+    # spc += np.random.normal(loc=0, scale=spc.std * 0.01, size=(len(spc),))
+    #
+    # lowess_params_grid_compare(spc, spc_ideal,
+    #                    deltas=list(range(1, 36, 2)),
+    #                    fracs=np.arange(0.001, 0.04, 0.002),
+    #                    iters=[1, 4, 16],
+    #                    path=r"C:\Users\user\Desktop\lowess_report.csv",
+    #                    loss=LossFunc.LOG2)
+
 

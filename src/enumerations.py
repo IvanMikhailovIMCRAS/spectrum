@@ -19,3 +19,4 @@ class LossFunc(Enum):
     RMSE = lambda y, y0: np.sqrt(np.sum(np.square(y - y0)))
     BINARY = lambda y, y0: np.sum(y == y0)
     MAE = lambda y, y0: np.mean(np.abs(y - y0))
+    LOG2 = lambda y, y0:  np.log2(np.sum(np.abs(y - y0)) + 1)

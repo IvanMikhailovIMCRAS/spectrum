@@ -1,6 +1,8 @@
 from src.spectrum import Spectrum
 import os
 from filter import filter_opus
+from enumerations import Scale
+from output import scale_change
 
 def get_spectra_list(**kwargs):
     """
@@ -77,3 +79,25 @@ def read_data(path='data', classify=False, recursive=False):
     paths = [paths[i] for i, clss in enumerate(classes) if clss is not None]
     classes = [clss for clss in classes if clss is not None]
     return list(zip(paths, classes))
+
+def read_columns(path, v_offset=0, delimiter=',', columns_indices=(0, 1), scale=Scale.WAVELENGTH_nm):
+    with open(path, 'r') as inp:
+        for _ in range(v_offset):
+            next(inp)
+        ws, ds = [], []
+        for line in inp.readlines():
+            cols = [n for i, n in enumerate(line.strip().split(delimiter)) if i in columns_indices]
+            # print(cols)
+            if len(cols) != 2:
+                continue
+            w, d = [float(col.replace(',', '.')) for col in cols]
+            w = scale_change(scale)(w)
+            ws.append(w)
+            ds.append(d)
+        return np.array(ws), np.array(ds)
+
+
+
+
+
+

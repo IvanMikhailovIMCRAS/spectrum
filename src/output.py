@@ -6,8 +6,6 @@ from enumerations import Scale
 def show_spectra(spectra, save_path='', wavenumbers=None):
     if not spectra:
         return
-    if isinstance(spectra, Spectrum):
-        spectra = [spectra]
     classes = list(sorted(set(map(lambda x: x.clss, spectra))))
     colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
     colors = dict(zip(classes, colors))

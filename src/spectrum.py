@@ -1,16 +1,8 @@
 from copy import deepcopy
 import numpy as np
-# import os
-# import matplotlib.pyplot as plt
 import brukeropusreader as opus
-# from random import sample
-# import logging
-# from scipy import sparse
-# from scipy.sparse.linalg import spsolve
-# from scipy.spatial import ConvexHull
-# from scipy.linalg import cholesky
+
 from scipy.signal import savgol_filter
-#from BaselineRemoval import BaselineRemoval
 from enumerations import NormMode, BaseLineMode, Scale
 from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx
 from baseline import baseline_alss, baseline_zhang, baseline_rubberband
@@ -57,7 +49,7 @@ class Spectrum:
         return len(self.wavenums)
 
     def __str__(self):
-        return '\t'.join((str(self.id), self.path, self.clss))
+        return '\t'.join((str(self.__id), self._path, self.clss))
 
     def __bool__(self):
         return len(self.wavenums) != 0
@@ -227,6 +219,11 @@ class Spectrum:
                 s.data = Spectrum.__ops[op](self.data, other.data)
             else:
                 raise SpcChangeEx
+        elif hasattr(other, '__iter__'):
+            if len(self) == len(other):
+                s.data = Spectrum.__ops[op](self.data, other)
+            else:
+                raise SpcChangeEx
         else:
             raise TypeError
         return s
@@ -238,6 +235,11 @@ class Spectrum:
         elif isinstance(other, Spectrum):
             if self.is_comparable(other):
                 self.data = Spectrum.__ops[op](self.data, other.data)
+            else:
+                raise SpcChangeEx
+        elif hasattr(other, '__iter__'):
+            if len(self) == len(other):
+                self.data += other
             else:
                 raise SpcChangeEx
         else:
@@ -311,24 +313,6 @@ class Spectrum:
                 return x[:-1], y[:-1]
             return x, y
 
-    @classmethod
-    def read_csv(cls, path):
-        """
-        Read the only spectrum from the .csv file
-        """
-        with open(path, 'r') as csv:
-            scale = csv.readline().split(',')
-            scale_type, *scale = scale
-            if scale_type == Scale.WAVENUMBERS.value:
-                f = float
-            elif scale_type == Scale.WAVELENGTH_um.value:
-                f = lambda x: 10_000. / float(x)
-            else:
-                f = lambda x: 10_000_000. / float(x)
-            scale = np.array(list(map(f, scale)))
-            clss, *data = csv.readline().strip().split(',')
-            data = np.array(list(map(float, data)))
-            return scale, data, clss
 
     def save_as_csv(self, path, scale_type=Scale.WAVENUMBERS):
         """
@@ -347,8 +331,29 @@ class Spectrum:
             print(scale_type.value, *scale, sep=',', file=out)
             print(self.clss, *self.data, sep=',', file=out)
 
+
+
     def interpolate(self):
         pass
+
+    @classmethod
+    def read_csv(cls, path):
+        """
+        Read the only spectrum from the .csv file
+        """
+        with open(path, 'r') as csv:
+            scale = csv.readline().split(',')
+            scale_type, *scale = scale
+            if scale_type == Scale.WAVENUMBERS.value:
+                f = float
+            elif scale_type == Scale.WAVELENGTH_um.value:
+                f = lambda x: 10_000. / float(x)
+            else:
+                f = lambda x: 10_000_000. / float(x)
+            scale = np.array(list(map(f, scale)))
+            clss, *data = csv.readline().strip().split(',')
+            data = np.array(list(map(float, data)))
+            return scale, data, clss
     
 if __name__ == '__main__':
     print('Hi')
