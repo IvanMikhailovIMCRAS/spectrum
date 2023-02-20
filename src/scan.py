@@ -3,6 +3,7 @@ import os
 from filter import filter_opus
 from enumerations import Scale
 from output import scale_change
+import numpy as np
 
 def get_spectra_list(**kwargs):
     """
@@ -86,14 +87,17 @@ def read_columns(path, v_offset=0, delimiter=',', columns_indices=(0, 1), scale=
             next(inp)
         ws, ds = [], []
         for line in inp.readlines():
-            cols = [n for i, n in enumerate(line.strip().split(delimiter)) if i in columns_indices]
-            # print(cols)
-            if len(cols) != 2:
+            try:
+                cols = [n for i, n in enumerate(line.strip().split(delimiter)) if i in columns_indices]
+                # print(cols)
+                if len(cols) != 2:
+                    continue
+                w, d = [float(col.replace(',', '.')) for col in cols]
+                w = scale_change(scale)(w)
+                ws.append(w)
+                ds.append(d)
+            except:
                 continue
-            w, d = [float(col.replace(',', '.')) for col in cols]
-            w = scale_change(scale)(w)
-            ws.append(w)
-            ds.append(d)
         return np.array(ws), np.array(ds)
 
 

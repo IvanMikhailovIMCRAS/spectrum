@@ -20,9 +20,9 @@ def baseline_rubberband(x, y):
     base1 = base[base.argmin():]
     base2 = base[:base.argmin() + 1]
     base1 = list(base1 if y[base1[1]] < y[base2[1]] else base2)
-    base1 =  [len(x) - 1] + base1 + [0]
+    base1 = [len(x) - 1] + base1 + [0]
     new_y = y - np.interp(x, x[base1], y[base1])
-    return x, new_y
+    return new_y
 
 
 def baseline_alss(y, lam=1e6, p=1e-3, niter=10):

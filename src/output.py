@@ -10,7 +10,6 @@ def show_spectra(spectra, save_path='', wavenumbers=None):
     colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
     colors = dict(zip(classes, colors))
     plt.figure()
-
     lines = []
     clrs = []
     for spc in spectra:

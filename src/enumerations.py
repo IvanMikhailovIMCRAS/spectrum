@@ -20,3 +20,8 @@ class LossFunc(Enum):
     BINARY = lambda y, y0: np.sum(y == y0)
     MAE = lambda y, y0: np.mean(np.abs(y - y0))
     LOG2 = lambda y, y0:  np.log2(np.sum(np.abs(y - y0)) + 1)
+
+class Smooth(Enum):
+    LINEAR = 'linear'
+    CUBIC_SPLINE = 'cubic'
+    HERMITE = 'hermite'

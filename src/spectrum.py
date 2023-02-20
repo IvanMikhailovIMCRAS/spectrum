@@ -3,9 +3,11 @@ import numpy as np
 import brukeropusreader as opus
 
 from scipy.signal import savgol_filter
-from enumerations import NormMode, BaseLineMode, Scale
+from enumerations import NormMode, BaseLineMode, Scale, Smooth
 from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx
 from baseline import baseline_alss, baseline_zhang, baseline_rubberband
+from scipy.interpolate import CubicHermiteSpline, CubicSpline, interp1d
+
 
 
 # add range
@@ -116,7 +118,7 @@ class Spectrum:
         elif method == BaseLineMode.ZHANG:
             self.data = baseline_zhang(self.data, **kwargs)
         else:
-            self.data = baseline_rubberband(self.data, **kwargs)
+            self.data = baseline_rubberband(self.wavenums, self.data)
 
     def atr_to_absorbace(self):
         """
@@ -331,10 +333,29 @@ class Spectrum:
             print(scale_type.value, *scale, sep=',', file=out)
             print(self.clss, *self.data, sep=',', file=out)
 
+    def auc(self):
+        return np.trapz(self.data, (0, len(self) - 1))
+
+    def integrate(self, n=1,):
+        y = self.data
+        for _ in range(n):
+            y = y.cumsum()
+        self.data = y
+
+    def interpolate(self, x, mode=Smooth.CUBIC_SPLINE):
+        newx = x[::-1]
+        oldx, oldy = self.wavenums[::-1], self.data[::-1]
+        if mode == Smooth.CUBIC_SPLINE:
+            f = CubicSpline(oldx, oldy,)
+        elif mode == Smooth.LINEAR:
+            f = interp1d(oldx, oldy)
+            pass
+        else:
+            f = CubicHermiteSpline(oldx, oldy, self.get_derivative().data)
+        newy = f(newx)[::-1]
+        self.wavenums, self.data = x, newy
 
 
-    def interpolate(self):
-        pass
 
     @classmethod
     def read_csv(cls, path):
@@ -357,3 +378,5 @@ class Spectrum:
     
 if __name__ == '__main__':
     print('Hi')
+
+

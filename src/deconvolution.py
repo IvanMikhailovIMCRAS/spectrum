@@ -52,18 +52,12 @@ class Deconvolutor:
         return self.loss_func(self.spectrum.data, self.__approximation(v))  # np.sum(np.square(data - approx_data))
 
     def deconvolute(self):
-        # spc = Spectrum()
-        # plt.figure()
         spc = self.spectrum * 1
-        # plt.plot(self.spectrum.wavenums, self.spectrum.data, 'b')
         spc.data = spc.get_derivative(n=2)
-        # plt.plot(spc.wavenums, spc.data, 'p')
-        # plt.show()
         indices = spc.get_extrema(minima=True)[0]
         thr = spc.std * self.threshold
         indices = filter(lambda x: abs(self.spectrum.data[x]) > thr, indices)
         self.minima = list(indices)
-        # print('Indices: ', self.minima)
         initial_params = self.__init_params()
         res = minimize(self.loss,  # lambda x: self.loss(x, data=self.spectrum.data),
                        initial_params, method='Nelder-Mead', tol=1e-6).x
