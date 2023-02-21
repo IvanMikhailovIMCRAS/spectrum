@@ -72,13 +72,16 @@ class ParamGrid:
     def score(cls, spc, fold, process, loss=LossFunc.RMSE):
         results = []
         for basis, reference in ParamGrid._comb_spectrum(spc, fold):
+            basis.interpolate(spc.wavenums)
+            reference.interpolate(spc.wavenums)
             yproc = process(basis)
-            results.append(loss(yproc,))
-
-
-
-
-
+            results.append(loss(yproc, reference.data))
+        results = np.array(results)
+        return {
+            'mean': results.mean(),
+            'max': results.max(),
+            'min': results.min()
+        }
 
 
 def savgol(data, window_length=7, order=5):
@@ -186,6 +189,7 @@ if __name__ == '__main__':
         sp2 = sp * 1
         sp2.clss = 'int'
         sp2.interpolate(noised.wavenums, mode=Smooth.HERMITE)
+        sp2
         show_spectra([sp2, sp, noised])
 
 

@@ -146,7 +146,7 @@ class Spectrum:
         if win_width % 2 != 1:
             win_width += 1
 
-        return savgol_filter(
+        self.data = savgol_filter(
             self.data, win_width, polyorder=order, deriv=n)
 
     def get_extrema(self, locals=True, minima=False, include_edges=False):
@@ -351,10 +351,10 @@ class Spectrum:
             f = interp1d(oldx, oldy)
             pass
         else:
-            f = CubicHermiteSpline(oldx, oldy, self.get_derivative().data)
+            self.get_derivative()
+            f = CubicHermiteSpline(oldx, oldy, self.data)
         newy = f(newx)[::-1]
         self.wavenums, self.data = x, newy
-
 
 
     @classmethod

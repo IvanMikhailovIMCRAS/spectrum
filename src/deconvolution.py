@@ -53,7 +53,7 @@ class Deconvolutor:
 
     def deconvolute(self):
         spc = self.spectrum * 1
-        spc.data = spc.get_derivative(n=2)
+        spc.get_derivative(n=2)
         indices = spc.get_extrema(minima=True)[0]
         thr = spc.std * self.threshold
         indices = filter(lambda x: abs(self.spectrum.data[x]) > thr, indices)
@@ -105,51 +105,3 @@ if __name__ == '__main__':
     #     (2.9, 3024., 467., 0.4),
     #     (0.5, 10532., 380., 0.1)
     # ]
-    # sp = create_spectrum(x, params)
-    # # sp.data += np.random.normal(loc=0, scale=sp.std * 0.01, size=(len(x),))
-    # sp2 = sp * 1
-    # # sp.data = sp.get_derivative(n=2)
-    # # d = sm.nonparametric.lowess(sp2.data, sp2.wavenums, frac=0.10, delta=15, it=3)
-    # # sp2.data, sp2.wavenums = d[::-1, 1], d[::-1, 0]# d = sm.nonparametric.lowess(sp2.data, sp2.wavenums, frac=0.10, delta=15, it=3)
-    # # sp2.data, sp2.wavenums = d[::-1, 1], d[::-1, 0]
-    # sp.clss = 'smoothed'
-    # sp2.data = sp2.get_derivative(n=2)
-    # plt.plot(x, sp2.data)
-    # plt.show()
-    # # show_spectra()
-
-    # plt.figure()
-    # x = np.arange(-4.5, 4.5, 0.01)
-    # w, amp, mu = 1., 3., 0.
-    # gau = gauss(x, amp, mu, w)
-    # lor = lorentz(x, amp, mu, w)
-    # voi = voigt(x, amp, mu, w, 0.5)
-    # s =  np.max(np.fft.ifft(np.fft.fft(lor) * np.fft.fft(gau)).real)
-    # slv =  np.max(np.fft.ifft(np.fft.fft(lor) * np.fft.fft(voi)).real)
-    # sgv =  np.max(np.fft.ifft(np.fft.fft(voi) * np.fft.fft(gau)).real)
-    # sgg =  np.max(np.fft.ifft(np.fft.fft(gau) * np.fft.fft(gau)).real)
-    # sll =  np.max(np.fft.ifft(np.fft.fft(lor) * np.fft.fft(lor)).real)
-    # print(sgg, sgv, s, slv, sll)
-    # plt.plot(x, gau, label='gauss')
-    # plt.plot(x, lor, label='lorentz')
-    # plt.plot(x, voi, label='voigt')
-    # plt.legend()
-    # plt.show()
-
-    # print(width_sigma)
-    # amp, m, w = 3., 1., 0.5
-    # x = np.arange(-3., 4., 0.01)
-    # #print(voigt(x, amp, m, w, 0.5))
-    # plt.figure(figsize=(7, 9))
-    # plt.xlim((-3., 4.))
-    # # plt.plot(x, voigt(x, amp, m, w, 0.5))
-    # g = gauss(x, amp, m, w)
-    # l = lorentz(x, amp, m, w)
-    # plt.plot(x, g, 'g', label='gauss')
-    # plt.plot(x, l, 'b', label='lorentz')
-    # for i in np.arange(.1, .9, .1):
-    #     plt.plot(x, voigt(x, amp, m, w, i), label=f'voigt {np.round(i, 1)}')
-    # plt.legend()
-    # plt.show()
-    # # print(*[i for i in dcv.deconvolute()], sep='\n')
-
