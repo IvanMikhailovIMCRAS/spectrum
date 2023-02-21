@@ -40,6 +40,7 @@ class ParamGrid:
     
     @staticmethod
     def params_grid_compare(spc, spc_ideal, prng,
+                            process,
                                    path='lowess_report.csv',
                                    delimiter=',',
                                    loss=LossFunc.RMSE):
@@ -47,19 +48,23 @@ class ParamGrid:
         with open(path, 'w') as out:
             out.write(delimiter.join(headers) + '\n')
             for params in ParamGrid.param_gen(prng):
-                line = [str(np.round(params[param], 3) for param in params)]
+                line = [str(np.round(params[param], 3)) for param in params]
                 cursp = spc * 1
-                t1 = time.time()
-                d = sm.nonparametric.lowess(spc.data, spc.wavenums, **params)
-                t2 = time.time()
-                cursp.data = d[::-1, 1]
-                cursp.data = spc.get_derivative(n=2)
+                try:
+                    t1 = time.time()
+                    d = process(spc, **params)
+                    t2 = time.time()
+                except:
+                    continue
+                cursp.data = d
+                # cursp.data = spc.get_derivative(n=2)
                 line.append(str(len(cursp.get_extrema(minima=False, locals=True, include_edges=False)[1])))
                 line.append(str(t2 - t1))
                 line.append(str(loss(cursp.data, spc_ideal.data)))
                 out.write(delimiter.join(line) + '\n')
 
-    def _comb_spectrum(self, spc, fold=2):
+    @classmethod
+    def _comb_spectrum(cls, spc, fold=2):
         assert fold >= 2, 'Can\'t split in case fold < 2!'
         size = len(spc)
         for offset in range(fold):
@@ -72,126 +77,126 @@ class ParamGrid:
     def score(cls, spc, fold, process, loss=LossFunc.RMSE):
         results = []
         for basis, reference in ParamGrid._comb_spectrum(spc, fold):
-            basis.interpolate(spc.wavenums)
-            reference.interpolate(spc.wavenums)
-            yproc = process(basis)
-            results.append(loss(yproc, reference.data))
+            try:
+                basis.interpolate(spc.wavenums)
+                reference.interpolate(spc.wavenums)
+                yproc = process(basis)
+                results.append(loss(yproc, reference.data))
+            except:
+                continue
         results = np.array(results)
-        return {
-            'mean': results.mean(),
-            'max': results.max(),
-            'min': results.min()
-        }
+        return np.round(results.mean(), 4)
 
+    @classmethod
+    def peaks_losses(cls, noised, ideal, process, config: dict, iterby: str, loss=LossFunc.RMSE, ):
+        real_peaks_number = len(ideal.get_extrema(minima=False, locals=True)[0])
+        losses = []
+        peaks = []  # [len(noised.get_extrema(minima=False, locals=True)[0])]
+        addspc = noised * 1
+        prms = []
 
-def savgol(data, window_length=7, order=5):
-    return savgol_filter(data, window_length=window_length, polyorder=order)
+        for prm in ParamGrid.param_gen(config, iterby):
+            prms.append(prm[iterby])
+            y = process(noised, **prm)
+            addspc.data = y
+            peaks.append(len(addspc.get_extrema(minima=False, locals=True)[0]))
+            losses.append(loss(y, ideal.data))
 
-
-def moving_average(data, window=5):
-    w = data[:window - 1].sum()
-    hw = window // 2
-    res = list(data[:hw])
-    for i in range(hw, len(data) - hw):
-        w += data[i + hw]
-        res.append(w / window)
-        w -= data[i - hw]
-    res.extend(data[len(data) - hw:])
-    assert len(res) == len(data)
-    res = np.array(res, dtype=float)
-    return res
-
-
-def iterative_smoothing(data, smoothfunc, n_iter, lossfunc=LossFunc.RMSE, show_smoothed=False, **kwargs):
-    iterations = list(range(1, n_iter + 1))
-    res = []
-    smoothed = np.array(data, copy=True)
-    if show_smoothed:
-        plt.figure()
-    for iteration in iterations:
-        smoothed = smoothfunc(smoothed, **kwargs)
-        if show_smoothed and iteration % 100 == 0:
-            plt.plot(smoothed)
-        res.append(lossfunc(data, smoothed))
-    if show_smoothed:
+        _, (ax1, ax2) = plt.subplots(1, 2)
+        ax1.plot(prms, losses)
+        ax1.set_title('Losses')
+        ax2.plot(prms, peaks)
+        ax2.set_title('Peak number')
+        ax2.axhline(real_peaks_number, color='r')
+        ax1.set_xlabel(iterby)
+        ax2.set_xlabel(iterby)
         plt.show()
-    plt.figure()
-    plt.plot(iterations, res, label='Loss(n)')
-    plt.plot(iterations, savgol_filter(res, deriv=1, window_length=13, polyorder=5), label='dLoss/dn')
-    plt.legend()
-    plt.show()
 
+    def get_optimal_params(self, ):
+        pass
 
-def Fourier_filter(y, l, h):
-    x = np.array(range(len(y)))
-    xf = np.array(range(0, len(y), 2))
-    plt.figure()
-    plt.plot(y, label='D')
-    y = fftshift(fft(y))
-    m = mode(y)[0]
-    y = y[len(y) // 2:]
-    y[:int(len(y) * l)] = 0
-    y[:int((1 - h) * len(y))] = 0
-    y = ifft(y)
-    y = np.interp(x, xf, y)
-    plt.plot(y, label='F')
-    plt.show()
+class Smoother(ParamGrid):
+    methods = ['savgol', 'moving_average', 'lowess', 'fourier']
+    configs = {
+        'savgol': {
+            'window_length': list(range(1, 36, 2)),
+            'order': [3, 4, 5, 6, 7]
+        },
+        'moving_average': {
+            'window': list(range(1, 36, 2))
+        },
+        'fourier': {
+            'threshold': [1e-5],
+            'size': np.arange(0.95, 1., 0.01)
+        },
+        'lowess': {
 
+        }
+    }
 
-def lowess(spc, delta=17, frac=0.003, iter=3):
-    d = sm.nonparametric.lowess(spc.data, spc.wavenums, delta=delta, frac=frac, it=iter)
-    data = d[::-1, 1]
-    return data
+    @classmethod
+    def savgol(cls, spc, window_length=7, order=5):
+        data = spc.data
+        return savgol_filter(data, window_length=window_length, polyorder=order)
 
+    @classmethod
+    def moving_average(cls, spc, window=5):
+        data = spc.data
+        w = data[:window - 1].sum()
+        hw = window // 2
+        res = list(data[:hw])
+        for i in range(hw, len(data) - hw):
+            w += data[i + hw]
+            res.append(w / window)
+            w -= data[i - hw]
+        res.extend(data[len(data) - hw:])
+        assert len(res) == len(data)
+        res = np.array(res, dtype=float)
+        return res
 
-def fourier(spc, thr, size):
-    y = spc.data
-    y = fft(y)
-    abs_vals = np.abs(y)
-    level = thr * np.max(abs_vals)
-    y[abs_vals < level] = 0
-    y[int(len(y) * size):] = 0
-    assert len(spc) == len(ifft(y))
-    return ifft(y)
+    @classmethod
+    def iterative_smoothing(cls, spc, smoothfunc, n_iter, lossfunc=LossFunc.RMSE, show_smoothed=False, **kwargs):
+        data = spc.data
+        iterations = list(range(1, n_iter + 1))
+        res = []
+        smoothed = np.array(data, copy=True)
+        for iteration in iterations:
+            smoothed = smoothfunc(smoothed, **kwargs)
+            if show_smoothed and iteration % 100 == 0:
+                plt.plot(smoothed)
+            res.append(lossfunc(data, smoothed))
+        if show_smoothed:
+            plt.show()
+        plt.figure()
+        plt.plot(iterations, res, label='Loss(n)')
+        plt.plot(iterations, savgol_filter(res, deriv=1, window_length=13, polyorder=5), label='dLoss/dn')
+        plt.legend()
+        plt.show()
 
+    @classmethod
+    def lowess(cls, spc, delta=17, frac=0.003, iter=3):
+        d = sm.nonparametric.lowess(spc.data, spc.wavenums, delta=delta, frac=frac, it=iter)
+        data = d[::-1, 1]
+        return data
 
-def peaks_losses(noised, ideal, smooth, config: dict, iterby: str, loss=LossFunc.RMSE):
-    real_peaks_number = len(ideal.get_extrema(minima=False, locals=True)[0])
-    losses = []
-    peaks = []  # [len(noised.get_extrema(minima=False, locals=True)[0])]
-    addspc = noised * 1
-    prms = []
-
-    for prm in ParamGrid.param_gen(config, iterby):
-        prms.append(prm[iterby])
-        y = smooth(noised, **prm)
-        addspc.data = y
-        peaks.append(len(addspc.get_extrema(minima=False, locals=True)[0]))
-        losses.append(loss(y, ideal.data))
-
-    _, (ax1, ax2) = plt.subplots(1, 2)
-    ax1.plot(prms, losses)
-    ax1.set_title('Losses')
-    ax2.plot(prms, peaks)
-    ax2.set_title('Peak number')
-    ax2.axhline(real_peaks_number, color='r')
-    ax1.set_xlabel(iterby)
-    ax2.set_xlabel(iterby)
-    plt.show()
+    @classmethod
+    def fourier(cls, spc, thr=1e-4, size=0.97):
+        y = spc.data
+        y = fft(y)
+        abs_vals = np.abs(y)
+        level = thr * np.max(abs_vals)
+        y[abs_vals < level] = 0
+        y[int(len(y) * size):] = 0
+        assert len(spc) == len(ifft(y))
+        return ifft(y)
 
 
 if __name__ == '__main__':
     print('Hi!')
     spc = get_spectra_list(path='../data', classify=True, recursive=True)[127]
     noised = spc + np.random.normal(loc=0, scale=spc.std * 0.01, size=(len(spc),))
-    fold = 2
-    for sp, ref in ParamGrid()._comb_spectrum(noised, fold=fold):
-        sp2 = sp * 1
-        sp2.clss = 'int'
-        sp2.interpolate(noised.wavenums, mode=Smooth.HERMITE)
-        sp2
-        show_spectra([sp2, sp, noised])
-
+    # ParamGrid.peaks_losses(noised, spc, config={'window_length': list(range(1, 36, 2))},
+    #                               process=Smoother.savgol, iterby='window_length')
 
 
     # show_spectra([spc])
