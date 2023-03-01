@@ -1,4 +1,4 @@
-from spectrum import Spectrum
+# from spectrum import Spectrum
 import numpy as np
 import matplotlib.pyplot as plt
 from enumerations import Scale
@@ -37,17 +37,3 @@ def spectra_log(spectra_dict, path='log.txt'):
         for spc in spectra_dict:
             print(spectra_dict[spc], file=f)
             
-def scale_change(scale_type):
-    """
-    Define the function of wavenumbers recalculation.
-    params
-    scale_type: Scale - determines the scale units
-
-    rtype: (str|float,) -> float
-    """
-    if scale_type == Scale.WAVELENGTH_nm:
-         return lambda x: 10_000_000. / float(x)
-    elif scale_type == Scale.WAVELENGTH_um:
-        return lambda x: 10_000. / float(x)
-    else:
-        return lambda x: float(x) / 1.

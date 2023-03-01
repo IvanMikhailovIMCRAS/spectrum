@@ -1,13 +1,12 @@
 from copy import deepcopy
 import numpy as np
 import brukeropusreader as opus
-
 from scipy.signal import savgol_filter
 from enumerations import NormMode, BaseLineMode, Scale, Smooth
 from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx
 from baseline import baseline_alss, baseline_zhang, baseline_rubberband
 from scipy.interpolate import CubicHermiteSpline, CubicSpline, interp1d
-
+from smoothing import Smoother
 
 
 # add range
@@ -126,9 +125,12 @@ class Spectrum:
         """
         self.data = Spectrum.__ATR_to_AB * self.data / self.wavenums
 
-    def smooth(self, method='savgol', **kwargs):
+    def smooth(self, method=Smoother.savgol, **kwargs):
         # пока один метод сглаживания, но можно дописать другие
-        self.data = savgol_filter(self.data, **kwargs)
+        # self.data = savgol_filter(self.data, **kwargs)
+        self.data = method(self, **kwargs)
+
+
 
     def get_derivative(self, n=1, win_width=13, order=5):
         """
@@ -341,6 +343,8 @@ class Spectrum:
         for _ in range(n):
             y = y.cumsum()
         self.data = y
+        # from scipy.integrate import quad
+
 
     def interpolate(self, x, mode=Smooth.CUBIC_SPLINE):
         newx = x[::-1]
@@ -355,6 +359,26 @@ class Spectrum:
             f = CubicHermiteSpline(oldx, oldy, self.data)
         newy = f(newx)[::-1]
         self.wavenums, self.data = x, newy
+
+    def __isintegral(self):
+        return 3 > len(self.get_extrema()[1] + self.get_extrema(minima=True)[1])
+        # return np.abs(self.data).max() < 0.25 # sum(map(lambda x: x < 0, self.data)) > 0.05 * len(self)
+        # mi = self.data.min()
+        # ma = self.data.max()
+        # return  (mi >= 0 or abs(ma) / abs(mi) > 10.)
+
+    def transform(self):
+        from output import show_spectra
+        count = 5
+        while abs(self.data.max()) < 1 and count and not self.__isintegral():
+            self.integrate()
+            # show_spectra([self])
+            count -= 1
+            if abs(self.data.min()) / abs(self.data.max()) > 100:
+                self *= -1
+            # if self.auc() < 0:
+            #     self *= -1
+        # self.get_derivative(2)
 
 
     @classmethod

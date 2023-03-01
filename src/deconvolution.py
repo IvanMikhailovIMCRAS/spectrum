@@ -7,26 +7,7 @@ from output import show_spectra
 from enumerations import LossFunc
 from random import random
 import statsmodels.api as sm
-
-width_sigma = 2 * np.sqrt(np.log(2))  # * np.sqrt(2)
-width_lambda = 2.
-
-
-# def gauss(x, amp, mu, sigma):
-#     return amp / sigma / np.sqrt(2.*np.pi) * np.exp(-0.5 * ((x - mu) / sigma)**2)
-
-def gauss(x, amp, mu, w):
-    sigma = w / width_sigma
-    return amp * np.exp(-np.square((x - mu) / sigma))
-
-
-def lorentz(x, amp, x0, w):
-    return amp / (np.square(2 * (x - x0) / w) + 1.)
-
-
-def voigt(x, amp, x0, w, gauss_prop):
-    assert 0 <= gauss_prop <= 1
-    return gauss_prop * gauss(x, amp, x0, w) + (1 - gauss_prop) * lorentz(x, amp, x0, w)
+from miscellaneous import gauss, lorentz, voigt
 
 
 class Deconvolutor:

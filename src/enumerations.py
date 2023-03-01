@@ -1,5 +1,5 @@
 from enum import Enum
-import numpy as np
+from numpy import sum, sqrt, log2, mean, abs, square
 class NormMode(Enum):
     VECTOR = 'vector'
     AREA = 'area'
@@ -16,10 +16,10 @@ class Scale(Enum):
     WAVELENGTH_um = 'Wavelength um'
 
 class LossFunc(Enum):
-    RMSE = lambda y, y0: np.sqrt(np.sum(np.square(y - y0)))
-    BINARY = lambda y, y0: np.sum(y == y0)
-    MAE = lambda y, y0: np.mean(np.abs(y - y0))
-    LOG2 = lambda y, y0:  np.log2(np.sum(np.abs(y - y0)) + 1)
+    RMSE = lambda y, y0: sqrt(sum(square(y - y0)))
+    BINARY = lambda y, y0: sum(y == y0)
+    MAE = lambda y, y0: mean(abs(y - y0))
+    LOG2 = lambda y, y0:  log2(sum(abs(y - y0)) + 1)
 
 class Smooth(Enum):
     LINEAR = 'linear'
