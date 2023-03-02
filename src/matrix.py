@@ -78,6 +78,7 @@ if __name__ == '__main__':
 
     mtr.save_matrix(r"C:\Users\user\Desktop\matrix.csv")
     show_spectra(mtr.spectra)
+    print(len(mtr.spectra))
 
 
 
