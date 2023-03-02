@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 # from scan import get_spectra_list, read_columns
 from output import show_spectra
 import os
-import statsmodels.api as sm
+# import statsmodels.api as sm
 import time
 from miscellaneous import gauss
 
@@ -165,8 +165,7 @@ class Smoother(ParamGrid):
             'threshold': [1e-5],
             'size': np.arange(0.95, 1., 0.01)
         },
-        'lowess': {
-        },
+        
         'gaussian': {
             'window_length': list(range(1, 18, 2)),
             'order': list(range(9))
@@ -239,11 +238,7 @@ class Smoother(ParamGrid):
         plt.legend()
         plt.show()
 
-    @staticmethod
-    def lowess(spc, delta=17, frac=0.003, iter=3):
-        d = sm.nonparametric.lowess(spc.data, spc.wavenums, delta=delta, frac=frac, it=iter)
-        data = d[::-1, 1]
-        return data
+    
 
     @staticmethod
     def fourier(spc, thr=1e-4, size=0.97):
@@ -260,10 +255,12 @@ class Smoother(ParamGrid):
 if __name__ == '__main__':
     print('Smooth!')
     from scan import get_spectra_list
-    spa = get_spectra_list(path='../data', classify=True, recursive=True)
-    spc = spa[127]
-    # print(Smoother.best_method_perfomance(spc, Smoother.savgol, Smoother.configs['savgol']))
-    print(Smoother.best_method(spc))
+    spa = get_spectra_list(path='new_data', classify=True, recursive=False)
+    for spc in spa:
+        print(spc)
+        show_spectra([spc])
+            
+            
 
     # print(getattr(Smoother, 'savgol')(spc))
 
