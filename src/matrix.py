@@ -1,38 +1,40 @@
 import numpy as np
-import spectrum as sp
-from scipy.stats import mode
-from enumerations import Scale
+# from spectrum import Spectrum
+from enumerations import Scale, BaseLineMode
 from scan import get_spectra_list, get_spectra_dict
-from output import scale_change
+from miscellaneous import scale_change
+from smoothing import Smoother
 
 class Matrix():
     def __init__(self, spectra):
         self.spectra = spectra
 
     @classmethod
-    def create_matrix(cls, raw_spectra):
+    def create_matrix(cls, raw_spectra,  config):
         # преобразование спектров других длин ?
-
         matrix = []
         if not raw_spectra:
-            return np.zeros((1, 1))
-        length, _ = mode([len(x)
-                          for x in raw_spectra if len(x) != 0], keepdims=False)
-        sample = np.zeros((length,))
-        for raw_spectrum in raw_spectra:
-            if raw_spectrum and len(raw_spectrum) == length:
-                matrix.append(raw_spectrum.data)
-                sample += raw_spectrum.data
-            else:
-                pass
-        return Matrix(np.array(matrix))
+            return
+        for spc in raw_spectra:
+            spc.transform()
+            if spc.data.max() > 10:
+                continue
+            if 'smooth' in config:
+                spc.smooth(**config['smooth'])
+            if 'baseline' in config:
+                spc.correct_baseline(**config['baseline'])
+            if 'normalize' in config:
+                spc.normalize(**config['normalize'])
+
+            matrix.append(spc)
+        return Matrix(matrix)
 
     @property
     def sample_spectrum(self):
         pass
 
     @classmethod
-    def read_csv(self, path, scale_type=Scale.WAVENUMBERS):
+    def read_csv(cls, path, scale_type=Scale.WAVENUMBERS):
         with open(path, 'r') as csv:
             scale = csv.readline().split(',')
             scale_type, *scale = scale
@@ -65,12 +67,20 @@ class Matrix():
 
 if __name__ == '__main__':
     print('HI')
-    spa = get_spectra_list(classify=True, recursive=True)
-    mtr = Matrix(spa)
-    # mtr.save_matrix()
-    spa = Matrix.read_csv('matrix.csv')
-    for _, _, clss in spa:
-        print(clss)
+    spa = get_spectra_list(path='../data', classify=True, recursive=True)[:]
+    from output import show_spectra
+    spc = spa[127]
+
+    from enumerations import LossFunc, BaseLineMode, NormMode
+    mtr = Matrix.create_matrix(spa, {'baseline': {'method': BaseLineMode.RB},
+                                     'smooth': {'method': Smoother.wiener},
+                                     'normalize': {'method': NormMode.MINMAX}})
+
+    mtr.save_matrix(r"C:\Users\user\Desktop\matrix.csv")
+    show_spectra(mtr.spectra)
+    print(len(mtr.spectra))
+
+
 
 
 

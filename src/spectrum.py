@@ -1,19 +1,12 @@
 from copy import deepcopy
 import numpy as np
-# import os
-# import matplotlib.pyplot as plt
 import brukeropusreader as opus
-# from random import sample
-# import logging
-# from scipy import sparse
-# from scipy.sparse.linalg import spsolve
-# from scipy.spatial import ConvexHull
-# from scipy.linalg import cholesky
 from scipy.signal import savgol_filter
-#from BaselineRemoval import BaselineRemoval
-from enumerations import NormMode, BaseLineMode, Scale
+from enumerations import NormMode, BaseLineMode, Scale, Smooth
 from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx
 from baseline import baseline_alss, baseline_zhang, baseline_rubberband
+from scipy.interpolate import CubicHermiteSpline, CubicSpline, interp1d
+from smoothing import Smoother
 
 
 # add range
@@ -57,7 +50,7 @@ class Spectrum:
         return len(self.wavenums)
 
     def __str__(self):
-        return '\t'.join((str(self.id), self.path, self.clss))
+        return '\t'.join((str(self.__id), self._path, self.clss))
 
     def __bool__(self):
         return len(self.wavenums) != 0
@@ -124,7 +117,7 @@ class Spectrum:
         elif method == BaseLineMode.ZHANG:
             self.data = baseline_zhang(self.data, **kwargs)
         else:
-            self.data = baseline_rubberband(self.data, **kwargs)
+            self.data = baseline_rubberband(self.wavenums, self.data)
 
     def atr_to_absorbace(self):
         """
@@ -132,9 +125,12 @@ class Spectrum:
         """
         self.data = Spectrum.__ATR_to_AB * self.data / self.wavenums
 
-    def smooth(self, method='savgol', **kwargs):
+    def smooth(self, method=Smoother.savgol, **kwargs):
         # пока один метод сглаживания, но можно дописать другие
-        self.data = savgol_filter(self.data, **kwargs)
+        # self.data = savgol_filter(self.data, **kwargs)
+        self.data = method(self, **kwargs)
+
+
 
     def get_derivative(self, n=1, win_width=13, order=5):
         """
@@ -152,7 +148,7 @@ class Spectrum:
         if win_width % 2 != 1:
             win_width += 1
 
-        return savgol_filter(
+        self.data = savgol_filter(
             self.data, win_width, polyorder=order, deriv=n)
 
     def get_extrema(self, locals=True, minima=False, include_edges=False):
@@ -227,6 +223,11 @@ class Spectrum:
                 s.data = Spectrum.__ops[op](self.data, other.data)
             else:
                 raise SpcChangeEx
+        elif hasattr(other, '__iter__'):
+            if len(self) == len(other):
+                s.data = Spectrum.__ops[op](self.data, other)
+            else:
+                raise SpcChangeEx
         else:
             raise TypeError
         return s
@@ -238,6 +239,11 @@ class Spectrum:
         elif isinstance(other, Spectrum):
             if self.is_comparable(other):
                 self.data = Spectrum.__ops[op](self.data, other.data)
+            else:
+                raise SpcChangeEx
+        elif hasattr(other, '__iter__'):
+            if len(self) == len(other):
+                self.data += other
             else:
                 raise SpcChangeEx
         else:
@@ -311,24 +317,6 @@ class Spectrum:
                 return x[:-1], y[:-1]
             return x, y
 
-    @classmethod
-    def read_csv(cls, path):
-        """
-        Read the only spectrum from the .csv file
-        """
-        with open(path, 'r') as csv:
-            scale = csv.readline().split(',')
-            scale_type, *scale = scale
-            if scale_type == Scale.WAVENUMBERS.value:
-                f = float
-            elif scale_type == Scale.WAVELENGTH_um.value:
-                f = lambda x: 10_000. / float(x)
-            else:
-                f = lambda x: 10_000_000. / float(x)
-            scale = np.array(list(map(f, scale)))
-            clss, *data = csv.readline().strip().split(',')
-            data = np.array(list(map(float, data)))
-            return scale, data, clss
 
     def save_as_csv(self, path, scale_type=Scale.WAVENUMBERS):
         """
@@ -347,8 +335,72 @@ class Spectrum:
             print(scale_type.value, *scale, sep=',', file=out)
             print(self.clss, *self.data, sep=',', file=out)
 
-    def interpolate(self):
-        pass
+    def auc(self):
+        return np.trapz(self.data, (0, len(self) - 1))
+
+    def integrate(self, n=1,):
+        y = self.data
+        for _ in range(n):
+            y = y.cumsum()
+        self.data = y
+        # from scipy.integrate import quad
+
+
+    def interpolate(self, x, mode=Smooth.CUBIC_SPLINE):
+        newx = x[::-1]
+        oldx, oldy = self.wavenums[::-1], self.data[::-1]
+        if mode == Smooth.CUBIC_SPLINE:
+            f = CubicSpline(oldx, oldy,)
+        elif mode == Smooth.LINEAR:
+            f = interp1d(oldx, oldy)
+            pass
+        else:
+            self.get_derivative()
+            f = CubicHermiteSpline(oldx, oldy, self.data)
+        newy = f(newx)[::-1]
+        self.wavenums, self.data = x, newy
+
+    def __isintegral(self):
+        return 3 > len(self.get_extrema()[1] + self.get_extrema(minima=True)[1])
+        # return np.abs(self.data).max() < 0.25 # sum(map(lambda x: x < 0, self.data)) > 0.05 * len(self)
+        # mi = self.data.min()
+        # ma = self.data.max()
+        # return  (mi >= 0 or abs(ma) / abs(mi) > 10.)
+
+    def transform(self):
+        from output import show_spectra
+        count = 5
+        while abs(self.data.max()) < 1 and count and not self.__isintegral():
+            self.integrate()
+            # show_spectra([self])
+            count -= 1
+            if abs(self.data.min()) / abs(self.data.max()) > 100:
+                self *= -1
+            # if self.auc() < 0:
+            #     self *= -1
+        # self.get_derivative(2)
+
+
+    @classmethod
+    def read_csv(cls, path):
+        """
+        Read the only spectrum from the .csv file
+        """
+        with open(path, 'r') as csv:
+            scale = csv.readline().split(',')
+            scale_type, *scale = scale
+            if scale_type == Scale.WAVENUMBERS.value:
+                f = float
+            elif scale_type == Scale.WAVELENGTH_um.value:
+                f = lambda x: 10_000. / float(x)
+            else:
+                f = lambda x: 10_000_000. / float(x)
+            scale = np.array(list(map(f, scale)))
+            clss, *data = csv.readline().strip().split(',')
+            data = np.array(list(map(float, data)))
+            return scale, data, clss
     
 if __name__ == '__main__':
     print('Hi')
+
+

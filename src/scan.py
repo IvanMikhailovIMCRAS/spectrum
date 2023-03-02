@@ -1,6 +1,9 @@
-from src.spectrum import Spectrum
+from spectrum import Spectrum
 import os
 from filter import filter_opus
+from enumerations import Scale
+from miscellaneous import scale_change
+import numpy as np
 
 def get_spectra_list(**kwargs):
     """
@@ -60,7 +63,6 @@ def read_data(path='data', classify=False, recursive=False):
         return paths, []
 
     classes = [None] * len(paths)
-    #parts0 = len(path.split(os.sep)) - 1
     for ind, path in enumerate(paths):
         path_parts = path.split(os.sep) # len(path.split(os.sep)) - parts0
         if not classify and not recursive:
@@ -77,3 +79,27 @@ def read_data(path='data', classify=False, recursive=False):
     paths = [paths[i] for i, clss in enumerate(classes) if clss is not None]
     classes = [clss for clss in classes if clss is not None]
     return list(zip(paths, classes))
+
+def read_columns(path, v_offset=0, delimiter=',', columns_indices=(0, 1), scale=Scale.WAVELENGTH_nm):
+    with open(path, 'r') as inp:
+        for _ in range(v_offset):
+            next(inp)
+        ws, ds = [], []
+        for line in inp.readlines():
+            try:
+                cols = [n for i, n in enumerate(line.strip().split(delimiter)) if i in columns_indices]
+                if len(cols) != 2:
+                    continue
+                w, d = [float(col.replace(',', '.')) for col in cols]
+                w = scale_change(scale)(w)
+                ws.append(w)
+                ds.append(d)
+            except:
+                continue
+        return np.array(ws), np.array(ds)
+
+
+
+
+
+
