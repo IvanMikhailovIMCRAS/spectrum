@@ -180,20 +180,7 @@ class Smoother(ParamGrid):
     @staticmethod
     def gaussian(spc, window_length=5, order=5):
         return gaussian_filter(spc.data, sigma=window_length, order=order)
-        # hw = window_length // 2
-        # filt = gauss(np.array(np.arange(-hw, hw + 1, 1)), 1., 0., hw)
-        # filt /= filt.sum()
-        # data = spc.data
-        # res = list(data[:hw])
-        # # print('filt ', filt)
-        # for i in range(hw, len(data) - hw):
-        #     # print(i -hw, i + hw)
-        #     # print(data[i - hw : i + hw + 1])
-        #     res[i] = sum(filt * res[i - hw : i + hw + 1])
-        # res.extend(data[len(data) - hw:])
-        # assert len(res) == len(data)
-        # res = np.array(res, dtype=float)
-        # return res
+
 
     @staticmethod
     def wiener(spc, window_length=5):

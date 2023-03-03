@@ -336,7 +336,7 @@ class Spectrum:
             print(self.clss, *self.data, sep=',', file=out)
 
     def auc(self):
-        return np.trapz(self.data, (0, len(self) - 1))
+        return np.trapz(self.data, dx=self.step)
 
     def integrate(self, n=1,):
         y = self.data
@@ -347,6 +347,10 @@ class Spectrum:
 
 
     def interpolate(self, x, mode=Smooth.CUBIC_SPLINE):
+        # changed = False
+        # if x[0] > x[1]:
+        #     newx = x[::-1]
+        #     changed = True
         newx = x[::-1]
         oldx, oldy = self.wavenums[::-1], self.data[::-1]
         if mode == Smooth.CUBIC_SPLINE:
