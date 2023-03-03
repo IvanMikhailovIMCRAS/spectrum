@@ -1,6 +1,6 @@
 import numpy as np
 # from spectrum import Spectrum
-from enumerations import Scale, BaseLineMode
+from enumerations import Scale, BaseLineMode, NormMode
 from scan import get_spectra_list, get_spectra_dict
 from miscellaneous import scale_change
 from smoothing import Smoother
@@ -16,16 +16,15 @@ class Matrix():
         if not raw_spectra:
             return
         for spc in raw_spectra:
-            spc.transform()
-            if spc.data.max() > 10:
-                continue
+            # spc.transform()
             if 'smooth' in config:
                 spc.smooth(**config['smooth'])
             if 'baseline' in config:
                 spc.correct_baseline(**config['baseline'])
             if 'normalize' in config:
                 spc.normalize(**config['normalize'])
-
+            if 'derivative' in config:
+                spc.get_derivative(**config['derivative'])
             matrix.append(spc)
         return Matrix(matrix)
 
@@ -66,21 +65,24 @@ class Matrix():
 
 
 if __name__ == '__main__':
-    print('HI')
-    spa = get_spectra_list(path='../data', classify=True, recursive=True)[:]
+    print('HI')    
+    spa = get_spectra_list(path='new_data', classify=True, recursive=False)
+    spc = spa[2]
+    # spc.correct_baseline(BaseLineMode.ZHANG)
     from output import show_spectra
-    spc = spa[127]
-
-    from enumerations import LossFunc, BaseLineMode, NormMode
-    mtr = Matrix.create_matrix(spa, {'baseline': {'method': BaseLineMode.RB},
-                                     'smooth': {'method': Smoother.wiener},
-                                     'normalize': {'method': NormMode.MINMAX}})
-
-    mtr.save_matrix(r"C:\Users\user\Desktop\matrix.csv")
-    show_spectra(mtr.spectra)
-    print(len(mtr.spectra))
-
-
+    # print(spc)
+    example = spc * 1
+    example.clss = 'ex'
+    mtr = Matrix.create_matrix(spa, {
+        'baseline': {'method': BaseLineMode.ZHANG},
+        'normalize': {'method': NormMode.VECTOR},
+        'smooth': {'method': Smoother.moving_average, 'window_length': 13},
+        #'derivative': {'n': 2}
+    })
+    # spc.smooth(Smoother.moving_average, window_length=45)
+    # show_spectra(mtr.spectra)
+    # print(mtr.spectra) + [example]
+    mtr.save_matrix()
 
 
 
