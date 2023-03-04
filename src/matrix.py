@@ -1,5 +1,5 @@
 import numpy as np
-# from spectrum import Spectrum
+from spectrum import Spectrum
 from enumerations import Scale, BaseLineMode, NormMode
 from scan import get_spectra_list, get_spectra_dict
 from miscellaneous import scale_change
@@ -67,22 +67,25 @@ class Matrix():
 if __name__ == '__main__':
     print('HI')    
     spa = get_spectra_list(path='new_data', classify=True, recursive=False)
-    spc = spa[2]
-    # spc.correct_baseline(BaseLineMode.ZHANG)
     from output import show_spectra
-    # print(spc)
-    example = spc * 1
-    example.clss = 'ex'
-    mtr = Matrix.create_matrix(spa, {
-        'baseline': {'method': BaseLineMode.ZHANG},
-        'normalize': {'method': NormMode.VECTOR},
-        'smooth': {'method': Smoother.moving_average, 'window_length': 13},
-        #'derivative': {'n': 2}
+    sp_cut = []
+    for sp in spa:
+        sp_cut.append(sp.range(1800, 900))
+    sp_cut = spa
+
+    show_spectra(spectra=sp_cut, save_path='raw.jpg')
+    [sp.normalize(method=NormMode.MINMAX) for sp in sp_cut]
+    [sp.correct_baseline(method=BaseLineMode.RB) for sp in sp_cut]
+    
+    mtr = Matrix.create_matrix(sp_cut, {
+        #'baseline': {'method': BaseLineMode.ZHANG},
+        #'normalize': {'method': NormMode.MINMAX},
+        #'smooth': {'method': Smoother.moving_average, 'window_length': 13},
+        'derivative': {'n': 2, 'win_width': 17}
     })
-    # spc.smooth(Smoother.moving_average, window_length=45)
-    # show_spectra(mtr.spectra)
-    # print(mtr.spectra) + [example]
-    mtr.save_matrix()
+
+    show_spectra(spectra=mtr.spectra, save_path='process.jpg')
+    mtr.save_matrix('new.csv')
 
 
 

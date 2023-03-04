@@ -26,7 +26,8 @@ class Spectrum:
 
     def __init__(self, wavenums=None, data=None, path='', clss: str = 'undefined'):
         if wavenums is None:
-            wavenums, data = np.array([], dtype=float), np.array([], dtype=float)
+            wavenums, data = np.array(
+                [], dtype=float), np.array([], dtype=float)
         self._path = path
         if path and path.endswith('.csv'):
             self.wavenums, self.data, clss = Spectrum.read_csv(path)
@@ -40,7 +41,8 @@ class Spectrum:
         self.clss = clss
         Spectrum.spectrum_id += 1
         self.__id = Spectrum.spectrum_id
-        self.step = abs(self.wavenums[1] - self.wavenums[0]) if len(self.wavenums) > 1 else 0
+        self.step = abs(
+            self.wavenums[1] - self.wavenums[0]) if len(self.wavenums) > 1 else 0
 
     @property
     def id(self):
@@ -72,7 +74,8 @@ class Spectrum:
 
         rtype: Spectrum
         """
-        start_ind = int((self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
+        start_ind = int(
+            (self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
         stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step) if lesser > self.wavenums[-1] else len(
             self)
         s = self * 1
@@ -82,9 +85,9 @@ class Spectrum:
 
     def select(self, *intervals):
         """
-		intervals --  края отрезков (wavenums), которые НУЖНО включить
-		rtype: None
-		"""
+                intervals --  края отрезков (wavenums), которые НУЖНО включить
+                rtype: None
+                """
         mask = [False] * len(self)
         intevals = [interval.sort() for interval in intervals]
         for i in range(len(self)):
@@ -110,6 +113,12 @@ class Spectrum:
             norm_coef = np.sqrt(np.sum(np.square(self.data)))
             self.data /= norm_coef
 
+    def cut_base(self, level=0):
+        """
+        Changes to <level> all ATR unit values that are less than the input <level>
+        """
+        self.wavenums[self.wavenums <= level] = level
+
     def correct_baseline(self, method=BaseLineMode.RB, **kwargs):
         # https://stackoverflow.com/questions/66039235/how-to-subtract-baseline-from-spectrum-with-rising-tail-in-python
         if method == BaseLineMode.ALSS:
@@ -118,7 +127,7 @@ class Spectrum:
             self.data = baseline_zhang(self.data, **kwargs)
         else:
             self.data = baseline_rubberband(self.wavenums, self.data)
-
+            
     def atr_to_absorbace(self):
         """
         Recalculate the values of the spectrum from attenuated total reflectance to absorbance.
@@ -129,8 +138,6 @@ class Spectrum:
         # пока один метод сглаживания, но можно дописать другие
         # self.data = savgol_filter(self.data, **kwargs)
         self.data = method(self, **kwargs)
-
-
 
     def get_derivative(self, n=1, win_width=13, order=5):
         """
@@ -164,11 +171,15 @@ class Spectrum:
         iextr = 1
 
         if minima:
-            f = lambda i: self.data[i - 1] > self.data[i] and self.data[i] < self.data[i + 1]
-            comp = lambda i, iextr: self.data[i] < self.data[iextr]
+            def f(
+                i): return self.data[i - 1] > self.data[i] and self.data[i] < self.data[i + 1]
+
+            def comp(i, iextr): return self.data[i] < self.data[iextr]
         else:
-            f = lambda i: self.data[i - 1] < self.data[i] and self.data[i] > self.data[i + 1]
-            comp = lambda i, iextr: self.data[i] > self.data[iextr]
+            def f(
+                i): return self.data[i - 1] < self.data[i] and self.data[i] > self.data[i + 1]
+
+            def comp(i, iextr): return self.data[i] > self.data[iextr]
 
         for i in range(1, len(self) - 1):
             if f(i):
@@ -273,8 +284,8 @@ class Spectrum:
 
     def __sub__(self, other):
         """
-		resulting spectrum inherits all the attributes of the first argument
-		"""
+                resulting spectrum inherits all the attributes of the first argument
+                """
         return Spectrum.__two_op_spectra_operation(self, other, '-')
 
     def __rsub__(self, other):
@@ -289,8 +300,8 @@ class Spectrum:
         rtype: bool
         '''
         return len(self) == len(other) \
-               and self.wavenums[0] == other.wavenums[0] \
-               and self.wavenums[-1] == other.wavenums[-1]
+            and self.wavenums[0] == other.wavenums[0] \
+            and self.wavenums[-1] == other.wavenums[-1]
 
     def change_size(self, sample):
         size = len(sample)
@@ -316,7 +327,6 @@ class Spectrum:
             if len(x) > 1:
                 return x[:-1], y[:-1]
             return x, y
-
 
     def save_as_csv(self, path, scale_type=Scale.WAVENUMBERS):
         """
@@ -344,7 +354,6 @@ class Spectrum:
             y = y.cumsum()
         self.data = y
         # from scipy.integrate import quad
-
 
     def interpolate(self, x, mode=Smooth.CUBIC_SPLINE):
         newx = x[::-1]
@@ -380,7 +389,6 @@ class Spectrum:
             #     self *= -1
         # self.get_derivative(2)
 
-
     @classmethod
     def read_csv(cls, path):
         """
@@ -392,15 +400,14 @@ class Spectrum:
             if scale_type == Scale.WAVENUMBERS.value:
                 f = float
             elif scale_type == Scale.WAVELENGTH_um.value:
-                f = lambda x: 10_000. / float(x)
+                def f(x): return 10_000. / float(x)
             else:
-                f = lambda x: 10_000_000. / float(x)
+                def f(x): return 10_000_000. / float(x)
             scale = np.array(list(map(f, scale)))
             clss, *data = csv.readline().strip().split(',')
             data = np.array(list(map(float, data)))
             return scale, data, clss
-    
+
+
 if __name__ == '__main__':
     print('Hi')
-
-

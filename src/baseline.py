@@ -19,7 +19,10 @@ def baseline_rubberband(x, y):
     base = np.roll(base, -base.argmax() - 1)
     base1 = base[base.argmin():]
     base2 = base[:base.argmin() + 1]
-    base1 = list(base1 if y[base1[1]] < y[base2[1]] else base2)
+    if len(base2) > 1:
+        base1 = list(base1 if y[base1[1]] < y[base2[1]] else base2)
+    else:
+        base1 = list(base1)
     base1 = [len(x) - 1] + base1 + [0]
     new_y = y - np.interp(x, x[base1], y[base1])
     return new_y
