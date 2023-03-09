@@ -8,6 +8,12 @@ from smoothing import Smoother
 class Matrix():
     def __init__(self, spectra):
         self.spectra = spectra
+        
+    @property
+    def shape(self):
+        if self.spectra:
+            return len(self.spectra), len(self.spectra[0])
+        return 0, 0
 
     @classmethod
     def create_matrix(cls, raw_spectra,  config):
@@ -62,6 +68,24 @@ class Matrix():
             print(scale_type.value, *scale, sep=',', file=out)
             for spc in self.spectra:
                 print(spc.clss, *spc.data, sep=',', file=out)
+                
+    def as_2d_array(self, predicate=lambda x: True):
+        return np.vstack([spc.data for spc in self.spectra if predicate(spc)])
+
+
+    def correlation(self):
+        avgs = sum(self.spectra) * (1 / self.shape[0]) 
+        res = np.zeros((self.shape[1], self.shape[1]))
+        mtr = self.as_2d_array()
+        for i in range(self.shape[1]):
+            for j in range(self.shape[1]):
+                res[i][j] = ((mtr[:, i] - avgs[i]) * (mtr[:, j] - avgs[j])).sum() / (
+                np.sqrt(np.std(mtr[:, i]) * np.std(mtr[:, j])))
+
+        return res
+                
+
+
 
 
 if __name__ == '__main__':
@@ -73,16 +97,50 @@ if __name__ == '__main__':
     # print(spc)
     example = spc * 1
     example.clss = 'ex'
-    mtr = Matrix.create_matrix(spa, {
-        'baseline': {'method': BaseLineMode.ZHANG},
-        'normalize': {'method': NormMode.VECTOR},
+    pre_0der_conf = {
+        'baseline': {'method': BaseLineMode.RB},
+        'normalize': {'method': NormMode.MINMAX},
         'smooth': {'method': Smoother.moving_average, 'window_length': 13},
         #'derivative': {'n': 2}
+    }
+    mtr = Matrix.create_matrix(spa, {
+        'baseline': {'method': BaseLineMode.RB},
+        'normalize': {'method': NormMode.MINMAX},
+        #'smooth': {'method': Smoother.moving_average, 'window_length': 13},
+        'derivative': {'n': 2}
     })
+    for i, spc in enumerate(mtr.spectra):
+        mtr.spectra[i] = spc.range(1850., 600.)
     # spc.smooth(Smoother.moving_average, window_length=45)
     # show_spectra(mtr.spectra)
     # print(mtr.spectra) + [example]
-    mtr.save_matrix()
+    spc = mtr.spectra[0]
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from output import heatmap, auto_heatmap
+    tp = 'healthy_131'
+    
+    def each_to_each(spc):
+        mtr = []
+        for i in range(len(spc)):
+            mtr.append(np.roll(spc.data, i))
+        return np.vstack(mtr)
+    
+    # corrcoefs = np.corrcoef(mtr.as_2d_array(lambda spc: spc.clss == tp))
+    # corrcoefs = np.corrcoef(each_to_each(spc))
+    # # corrcoefs = np.corrcoef(mtr.as_2d_array(lambda spc: spc.clss == 'epilepsy_71'))
+    
+    # print(corrcoefs.shape)
+    # fig, clrbr, ax = heatmap(corrcoefs)
+    # # plt.savefig(tp + '_heatmap.jpg')
+    # plt.show()
+    
+    heatmap(mtr.correlation())
+
+
+    
+    
+    
 
 
 
