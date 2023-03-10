@@ -351,8 +351,14 @@ class Spectrum:
         # if x[0] > x[1]:
         #     newx = x[::-1]
         #     changed = True
+
         newx = x[::-1]
-        oldx, oldy = self.wavenums[::-1], self.data[::-1]
+        reversed_x = False
+        if self.wavenums[-1] < self.wavenums[0]:
+            reversed_x = True
+        oldx, oldy = self.wavenums[::], self.data[::]
+        if reversed_x:
+            oldx, oldy = self.wavenums[::-1], self.data[::-1]
         if mode == Smooth.CUBIC_SPLINE:
             f = CubicSpline(oldx, oldy,)
         elif mode == Smooth.LINEAR:
@@ -361,7 +367,9 @@ class Spectrum:
         else:
             self.get_derivative()
             f = CubicHermiteSpline(oldx, oldy, self.data)
-        newy = f(newx)[::-1]
+        newy = f(newx)
+        if reversed_x:
+            newy = newy[::-1]
         self.wavenums, self.data = x, newy
 
     def __isintegral(self):
