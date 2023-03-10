@@ -243,9 +243,7 @@ if __name__ == '__main__':
     print('Smooth!')
     from scan import get_spectra_list
     spa = get_spectra_list(path='new_data', classify=True, recursive=False)
-    for spc in spa:
-        print(spc)
-        show_spectra([spc])
+    show_spectra(spa)
             
             
 

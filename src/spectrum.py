@@ -18,6 +18,7 @@ from smoothing import Smoother
 class Spectrum:
     __ATR_to_AB = 1000
     spectrum_id = 0
+    epsilon = 0.001
     __ops = {
         '+': lambda x, y: x + y,
         '-': lambda x, y: x - y,
@@ -289,8 +290,8 @@ class Spectrum:
         rtype: bool
         '''
         return len(self) == len(other) \
-               and self.wavenums[0] == other.wavenums[0] \
-               and self.wavenums[-1] == other.wavenums[-1]
+               and abs(self.wavenums[0] - other.wavenums[0]) / other.wavenums[0] < Spectrum.epsilon  \
+               and abs(self.wavenums[-1] - other.wavenums[-1]) / other.wavenums[-1] < Spectrum.epsilon
 
     def change_size(self, sample):
         size = len(sample)
