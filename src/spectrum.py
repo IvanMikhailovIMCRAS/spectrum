@@ -63,7 +63,7 @@ class Spectrum:
         for i in range(len(self)):
             yield self.wavenums[i], self.data[i]
 
-    def range(self, left, right, wavenums=True):
+    def range(self, left, right, x=True):
         """
         Create a new Spectrum limited by wavenumbers with the passed values.
 
@@ -74,7 +74,7 @@ class Spectrum:
         rtype: Spectrum
         """
         start, end = sorted([left, right])
-        axis = not wavenums
+        axis = not x
         # start_ind = int((self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
         # stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step) if lesser > self.wavenums[-1] else len(
         #     self)
@@ -86,7 +86,7 @@ class Spectrum:
             print('Incorrect range!')
             return self
         w, d = map(np.array, zip(*filtered))
-        return Spectrum(w, d, self.clss)
+        return Spectrum(wavenums=w, data=d, clss=self.clss)
 
     def select(self, *intervals):
         """
@@ -343,6 +343,12 @@ class Spectrum:
             print(scale_type.value, *scale, sep=',', file=out)
             print(self.clss, *self.data, sep=',', file=out)
 
+    def cut_base(self, level=0):
+        """
+        Changes to <level> all ATR unit values that are less than the input <level>
+        """
+        self.wavenums[self.wavenums <= level] = level
+
     def auc(self):
         return np.trapz(self.data, dx=self.step)
 
@@ -429,8 +435,7 @@ if __name__ == '__main__':
     spec = spc * 1
     spec.integrate(2)
     spec.correct_baseline()
-    spec = spec.range(3000, 1000,)
-    #print(spec.wavenums)
+    spec = spec.range(0.1, 0.5, x=False)
     show_spectra([spec])
 
 

@@ -72,25 +72,45 @@ class Matrix():
     def as_2d_array(self, predicate=lambda x: True):
         return np.vstack([spc.data for spc in self.spectra if predicate(spc)])
 
+    def corr_half(self, predicate):
+        C = 4
+        r = self.corr(predicate) + C
+        r = np.triu(r, 1) - C
+        return np.array(list(filter(lambda x: x >= -1, r.flatten())))
 
-    def correlation(self):
-        avgs = sum(self.spectra) * (1 / self.shape[0]) 
-        res = np.zeros((self.shape[1], self.shape[1]))
-        mtr = self.as_2d_array()
-        for i in range(self.shape[1]):
-            for j in range(self.shape[1]):
-                res[i][j] = ((mtr[:, i] - avgs[i]) * (mtr[:, j] - avgs[j])).sum() / (
-                np.sqrt(np.std(mtr[:, i]) * np.std(mtr[:, j])))
+    # def correlation(self):
+    #     avgs = sum(self.spectra) * (1 / self.shape[0])
+    #     res = np.zeros((self.shape[1], self.shape[1]))
+    #     mtr = self.as_2d_array()
+    #     print(mtr.shape, len(avgs))
+    #     def corr(spc):
+    #         for i in range(self.shape[1]):
+    #             for j in range(self.shape[1]):
+    #                 res[i][j] = ((mtr[:, i] - avgs[i])
+    #                              *
+    #                              (mtr[:, j] - avgs[j])).sum() / (
+    #                 np.sqrt(np.std(mtr[:, i]) * np.std(mtr[:, j])))
+    #         return res
 
-        return res
-                
+    def average_by_point(self):
+        res = np.zeros(self.shape[1])
+        for spc in self.spectra:
+            res += spc.data
+        return res / self.shape[0]
 
-
+    def corr(self, predicate):
+        import pandas as pd
+        mtr = self.as_2d_array(predicate)
+        # mtr = np.vstack([mtr[0], mtr[0]])
+        mtr = pd.DataFrame(mtr)
+        # print('SAMPLE: \n', mtr.sample())
+        # print('SHAPE: ', mtr.shape)
+        return mtr.corr()
 
 
 if __name__ == '__main__':
-    print('HI')    
-    spa = get_spectra_list(path='new_data', classify=True, recursive=False)
+    print('MATRIX')
+    spa = get_spectra_list(path='../new_data', classify=True, recursive=False)
     spc = spa[2]
     # spc.correct_baseline(BaseLineMode.ZHANG)
     from output import show_spectra
@@ -114,28 +134,12 @@ if __name__ == '__main__':
     # spc.smooth(Smoother.moving_average, window_length=45)
     # show_spectra(mtr.spectra)
     # print(mtr.spectra) + [example]
-    spc = mtr.spectra[0]
-    import numpy as np
+
+    from output import heatmap
     import matplotlib.pyplot as plt
-    from output import heatmap, auto_heatmap
-    tp = 'healthy_131'
-    
-    def each_to_each(spc):
-        mtr = []
-        for i in range(len(spc)):
-            mtr.append(np.roll(spc.data, i))
-        return np.vstack(mtr)
-    
-    # corrcoefs = np.corrcoef(mtr.as_2d_array(lambda spc: spc.clss == tp))
-    # corrcoefs = np.corrcoef(each_to_each(spc))
-    # # corrcoefs = np.corrcoef(mtr.as_2d_array(lambda spc: spc.clss == 'epilepsy_71'))
-    
-    # print(corrcoefs.shape)
-    # fig, clrbr, ax = heatmap(corrcoefs)
-    # # plt.savefig(tp + '_heatmap.jpg')
-    # plt.show()
-    
-    heatmap(mtr.correlation())
+
+    plt.hist(mtr.corr_half(lambda x: 'heal' in x.clss), bins=100)
+    plt.show()
 
 
     
