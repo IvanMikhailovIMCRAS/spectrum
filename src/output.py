@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from enumerations import Scale
 
 def show_spectra(spectra, save_path='', wavenumbers=None, legend=True):
+    spectra = list(filter(lambda x: bool(x), spectra))
     if not spectra:
         return
     classes = list(sorted(set(map(lambda x: x.clss, spectra))))
@@ -12,15 +13,21 @@ def show_spectra(spectra, save_path='', wavenumbers=None, legend=True):
     plt.figure()
     lines = []
     clrs = []
+    minx, maxx = 0, 10
     for spc in spectra:
         if spc:
             if wavenumbers:
                 spc = spc.range(*wavenumbers)
+                mi, ma = sorted((spc.wavenums[0], spc.wavenums[-1]))
+                if minx == 0 and maxx == 10:
+                    minx, maxx = mi, ma
+                minx = min(mi, minx)
+                maxx = max(ma, maxx)
             lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss], linewidth=0.5))
             clrs.append(spc.clss)
     if len(clrs) > 1 and legend:
         plt.legend(clrs)
-    plt.xlim(spc.wavenums[0], spc.wavenums[-1])
+    plt.xlim(minx, maxx)
     plt.xlabel('wavenumber, cm-1')
     plt.ylabel('intensity')
     if save_path:

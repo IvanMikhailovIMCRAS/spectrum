@@ -63,7 +63,7 @@ class Spectrum:
         for i in range(len(self)):
             yield self.wavenums[i], self.data[i]
 
-    def range(self, bigger, lesser):
+    def range(self, left, right, wavenums=True):
         """
         Create a new Spectrum limited by wavenumbers with the passed values.
 
@@ -73,13 +73,20 @@ class Spectrum:
 
         rtype: Spectrum
         """
-        start_ind = int((self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
-        stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step) if lesser > self.wavenums[-1] else len(
-            self)
-        s = self * 1
-        s.wavenums = s.wavenums[start_ind:stop_ind]
-        s.data = s.data[start_ind:stop_ind]
-        return s
+        start, end = sorted([left, right])
+        axis = not wavenums
+        # start_ind = int((self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
+        # stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step) if lesser > self.wavenums[-1] else len(
+        #     self)
+        # s = self * 1
+        # s.wavenums = s.wavenums[start_ind:stop_ind]
+        # s.data = s.data[start_ind:stop_ind]
+        filtered = list(filter(lambda wi: start <= wi[axis] <= end, self))
+        if not filtered:
+            print('Incorrect range!')
+            return self
+        w, d = map(np.array, zip(*filtered))
+        return Spectrum(w, d, self.clss)
 
     def select(self, *intervals):
         """
@@ -339,7 +346,7 @@ class Spectrum:
     def auc(self):
         return np.trapz(self.data, dx=self.step)
 
-    def integrate(self, n=1,):
+    def integrate(self, n=1):
         y = self.data
         for _ in range(n):
             y = y.cumsum()
@@ -415,5 +422,15 @@ class Spectrum:
     
 if __name__ == '__main__':
     print('Hi')
+    from scan import get_spectra_list
+    from output import show_spectra
+    spa = get_spectra_list(path='../data', recursive=True)
+    spc = spa[128]
+    spec = spc * 1
+    spec.integrate(2)
+    spec.correct_baseline()
+    spec = spec.range(3000, 1000,)
+    #print(spec.wavenums)
+    show_spectra([spec])
 
 
