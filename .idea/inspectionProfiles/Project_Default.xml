@@ -1,0 +1,38 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="25">
+            <item index="0" class="java.lang.String" itemvalue="defer" />
+            <item index="1" class="java.lang.String" itemvalue="netifaces" />
+            <item index="2" class="java.lang.String" itemvalue="onboard" />
+            <item index="3" class="java.lang.String" itemvalue="ufw" />
+            <item index="4" class="java.lang.String" itemvalue="menulibre" />
+            <item index="5" class="java.lang.String" itemvalue="pycups" />
+            <item index="6" class="java.lang.String" itemvalue="lightdm-gtk-greeter-settings" />
+            <item index="7" class="java.lang.String" itemvalue="apturl" />
+            <item index="8" class="java.lang.String" itemvalue="PyGObject" />
+            <item index="9" class="java.lang.String" itemvalue="python-debian" />
+            <item index="10" class="java.lang.String" itemvalue="catfish" />
+            <item index="11" class="java.lang.String" itemvalue="distro-info" />
+            <item index="12" class="java.lang.String" itemvalue="cupshelpers" />
+            <item index="13" class="java.lang.String" itemvalue="sgt-launcher" />
+            <item index="14" class="java.lang.String" itemvalue="systemd-python" />
+            <item index="15" class="java.lang.String" itemvalue="language-selector" />
+            <item index="16" class="java.lang.String" itemvalue="unattended-upgrades" />
+            <item index="17" class="java.lang.String" itemvalue="ubuntu-drivers-common" />
+            <item index="18" class="java.lang.String" itemvalue="xkit" />
+            <item index="19" class="java.lang.String" itemvalue="python-apt" />
+            <item index="20" class="java.lang.String" itemvalue="ubuntu-advantage-tools" />
+            <item index="21" class="java.lang.String" itemvalue="mugshot" />
+            <item index="22" class="java.lang.String" itemvalue="dbus-python" />
+            <item index="23" class="java.lang.String" itemvalue="command-not-found" />
+            <item index="24" class="java.lang.String" itemvalue="MarkupSafe" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
