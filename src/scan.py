@@ -87,9 +87,10 @@ def read_columns(path, v_offset=0, delimiter=',', columns_indices=(0, 1), scale=
         ws, ds = [], []
         for line in inp.readlines():
             try:
-                cols = [n for i, n in enumerate(line.strip().split(delimiter)) if i in columns_indices]
-                if len(cols) != 2:
-                    continue
+                cols = [n for n in filter(lambda x: x, line.strip().split(delimiter))]
+                # print(cols)
+                cols = [n for i, n in enumerate(cols) if i in columns_indices]
+
                 w, d = [float(col.replace(',', '.')) for col in cols]
                 w = scale_change(scale)(w)
                 ws.append(w)

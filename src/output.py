@@ -9,15 +9,17 @@ def show_spectra(spectra, save_path='', wavenumbers=None):
     classes = list(sorted(set(map(lambda x: x.clss, spectra))))
     colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
     colors = dict(zip(classes, colors))
-    plt.figure(figsize=(20,8))
+    plt.figure(figsize=(20, 8))
     lines = []
     clrs = []
+
     for spc in spectra:
-        if spc:
-            if wavenumbers:
-                spc = spc.range(*wavenumbers)
-            lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss], linewidth=0.5))
-            clrs.append(spc.clss)
+        # if spc:
+        #     spectrum = spc
+        if wavenumbers:
+            spc = spc.range(*wavenumbers)
+        lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss], linewidth=0.5))
+        clrs.append(spc.clss)
     clrs = list(set(clrs))
     #font = {'family':'serif','color':'black','size':18} 
     SMALL_SIZE = 16
@@ -32,7 +34,11 @@ def show_spectra(spectra, save_path='', wavenumbers=None):
     plt.rc('figure', titlesize=MEDIUM_SIZE)  # fontsize of the figure title
     if len(clrs) > 1:
         plt.legend(clrs, loc=0)
-    plt.xlim(spc.wavenums[0], spc.wavenums[-1])
+    spectrum = spectra[-1]
+    if len(spectrum) > 1:
+        plt.xlim(spectrum.wavenums[0], spectrum.wavenums[-1])
+    # print(spectrum.wavenums[0], spectrum.wavenums[-1])
+
     plt.xlabel('Wavenumber, cm-1')
     plt.ylabel('ATR units')
     if save_path:
@@ -49,3 +55,41 @@ def spectra_log(spectra_dict, path='log.txt'):
         for spc in spectra_dict:
             print(spectra_dict[spc], file=f)
             
+def heatmap(data, ax=None,
+            cbar_kw=None, cbarlabel="", path='', **kwargs):
+    if ax is None:
+        ax = plt.gca()
+
+    if cbar_kw is None:
+        cbar_kw = {}
+
+    # Plot the heatmap
+    im = ax.imshow(data, **kwargs)
+    # Create colorbar
+    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    if path:
+        plt.savefig(path, dpi=600)
+    else:
+        plt.show()
+
+    return im, cbar, ax
+
+def auto_heatmap(spc, step=100):
+    def each_to_each(spc):
+        mtr = []
+        for i in range(len(spc)):
+            mtr.append(np.roll(spc.data, i))
+        return np.vstack(mtr)
+    corrcoefs = np.corrcoef(each_to_each(spc))
+    *_, ax = heatmap(corrcoefs)
+    ax.set_xticks(np.arange(0, len(spc), step), labels=spc.wavenums[::step])
+    ax.set_yticks(np.arange(0, len(spc), step), labels=spc.wavenums[::step])
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=30, ha="right",
+             rotation_mode="anchor")
+
+    plt.show()

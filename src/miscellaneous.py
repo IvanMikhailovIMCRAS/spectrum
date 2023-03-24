@@ -34,6 +34,6 @@ def lorentz(x, amp, x0, w):
 
 
 def voigt(x, amp, x0, w, gauss_prop):
-    assert 0 <= gauss_prop <= 1
+    # assert 0 <= gauss_prop <= 1
     return gauss_prop * gauss(x, amp, x0, w) + (1 - gauss_prop) * lorentz(x, amp, x0, w)
 

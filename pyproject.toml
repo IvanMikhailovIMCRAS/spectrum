@@ -2,7 +2,7 @@
 name = "spectrum"
 version = "0.1.0"
 description = ""
-authors = ["Ivan Mikhailov <mikhailov.ivan@gmail.com>"]
+authors = ["Leon Strelkov <strelllleo@mail.ru>", "Ivan Mikhailov <mikhailov.ivan@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]

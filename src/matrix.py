@@ -1,5 +1,5 @@
 import numpy as np
-from spectrum import Spectrum
+# from spectrum import Spectrum
 from enumerations import Scale, BaseLineMode, NormMode
 from scan import get_spectra_list, get_spectra_dict
 from miscellaneous import scale_change
@@ -8,6 +8,12 @@ from smoothing import Smoother
 class Matrix():
     def __init__(self, spectra):
         self.spectra = spectra
+        
+    @property
+    def shape(self):
+        if self.spectra:
+            return len(self.spectra), len(self.spectra[0])
+        return 0, 0
 
     @classmethod
     def create_matrix(cls, raw_spectra,  config):
@@ -62,30 +68,83 @@ class Matrix():
             print(scale_type.value, *scale, sep=',', file=out)
             for spc in self.spectra:
                 print(spc.clss, *spc.data, sep=',', file=out)
+                
+    def as_2d_array(self, predicate=lambda x: True):
+        return np.vstack([spc.data for spc in self.spectra if predicate(spc)])
+
+    def corr_half(self, predicate):
+        C = 4
+        r = self.corr(predicate) + C
+        r = np.triu(r, 1) - C
+        return np.array(list(filter(lambda x: x >= -1, r.flatten())))
+
+    # def correlation(self):
+    #     avgs = sum(self.spectra) * (1 / self.shape[0])
+    #     res = np.zeros((self.shape[1], self.shape[1]))
+    #     mtr = self.as_2d_array()
+    #     print(mtr.shape, len(avgs))
+    #     def corr(spc):
+    #         for i in range(self.shape[1]):
+    #             for j in range(self.shape[1]):
+    #                 res[i][j] = ((mtr[:, i] - avgs[i])
+    #                              *
+    #                              (mtr[:, j] - avgs[j])).sum() / (
+    #                 np.sqrt(np.std(mtr[:, i]) * np.std(mtr[:, j])))
+    #         return res
+
+    def average_by_point(self):
+        res = np.zeros(self.shape[1])
+        for spc in self.spectra:
+            res += spc.data
+        return res / self.shape[0]
+
+    def corr(self, predicate):
+        import pandas as pd
+        mtr = self.as_2d_array(predicate)
+        # mtr = np.vstack([mtr[0], mtr[0]])
+        mtr = pd.DataFrame(mtr)
+        # print('SAMPLE: \n', mtr.sample())
+        # print('SHAPE: ', mtr.shape)
+        return mtr.corr()
 
 
 if __name__ == '__main__':
-    print('HI')    
-    spa = get_spectra_list(path='new_data', classify=True, recursive=False)
+    print('MATRIX')
+    spa = get_spectra_list(path='../new_data', classify=True, recursive=False)
+    spc = spa[2]
+    # spc.correct_baseline(BaseLineMode.ZHANG)
     from output import show_spectra
-    sp_cut = []
-    for sp in spa:
-        sp_cut.append(sp.range(1800, 900))
-    sp_cut = spa
-
-    show_spectra(spectra=sp_cut, save_path='raw.jpg')
-    [sp.normalize(method=NormMode.MINMAX) for sp in sp_cut]
-    [sp.correct_baseline(method=BaseLineMode.RB) for sp in sp_cut]
-    
-    mtr = Matrix.create_matrix(sp_cut, {
-        #'baseline': {'method': BaseLineMode.ZHANG},
-        #'normalize': {'method': NormMode.MINMAX},
+    # print(spc)
+    example = spc * 1
+    example.clss = 'ex'
+    pre_0der_conf = {
+        'baseline': {'method': BaseLineMode.RB},
+        'normalize': {'method': NormMode.MINMAX},
+        'smooth': {'method': Smoother.moving_average, 'window_length': 13},
+        #'derivative': {'n': 2}
+    }
+    mtr = Matrix.create_matrix(spa, {
+        'baseline': {'method': BaseLineMode.RB},
+        'normalize': {'method': NormMode.MINMAX},
         #'smooth': {'method': Smoother.moving_average, 'window_length': 13},
-        'derivative': {'n': 2, 'win_width': 17}
+        'derivative': {'n': 2}
     })
+    for i, spc in enumerate(mtr.spectra):
+        mtr.spectra[i] = spc.range(1850., 600.)
+    # spc.smooth(Smoother.moving_average, window_length=45)
+    # show_spectra(mtr.spectra)
+    # print(mtr.spectra) + [example]
 
-    show_spectra(spectra=mtr.spectra, save_path='process.jpg')
-    mtr.save_matrix('new.csv')
+    from output import heatmap
+    import matplotlib.pyplot as plt
+
+    plt.hist(mtr.corr_half(lambda x: 'heal' in x.clss), bins=100)
+    plt.show()
+
+
+    
+    
+    
 
 
 
