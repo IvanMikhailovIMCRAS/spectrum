@@ -2,22 +2,20 @@ from spectrum import Spectrum
 from output import show_spectra
 from scan import read_columns
 import os
-from deconvolution import Deconvolutor
 import matplotlib.pyplot as plt
 from enumerations import BaseLineMode, Scale, NormMode
 from miscellaneous import gauss
 import numpy as np
-import raman_fitting
 from scipy.optimize import least_squares, minimize
+from scan import get_spectra_list
 
 path = r"C:\Users\user\Desktop\bsa"
 spa = []
 # print(raman_fitting.SpectrumTemplate()
 # )
-for file in os.listdir(path):
-    fpath = os.path.join(path, file)
-    w, d = read_columns(fpath, v_offset=0, columns_indices=(0, 1), delimiter=',', scale=Scale.WAVENUMBERS)
-    spc = Spectrum(w, d, clss=file[:-18])
+for spc in get_spectra_list(path='new_data', recursive=True, classify=True)[:1]:
+    # w, d = read_columns(fpath, v_offset=0, columns_indices=(0, 1), delimiter=',', scale=Scale.WAVENUMBERS)
+    # spc = Spectrum(w, d, clss=file[:-18])
     spc.correct_baseline(BaseLineMode.ALSS)
     spc = spc.range(1590., 1710., x=True)
     points = np.linspace(1590., 1710., 1000)
@@ -36,17 +34,17 @@ for spc in spa:
     indices = list(filter(lambda x: orig[x][1] > eps * maxdata, spc.get_extrema(minima=True, locals=True)[0]))
     true_indices = indices[:]
     indices = list(map(lambda x: orig[x][0], indices))
-    plt.subplot(2, 1, 1)
-    plt.plot(orig.wavenums, orig.data, color='b')
-    for line in indices:
-        plt.axvline(line, color='r')
-    plt.ylabel('orig')
-    plt.subplot(2, 1, 2)
-    plt.plot(spc.wavenums, spc.data, color='b')
-    for line in indices:
-        plt.axvline(line, color='r')
-    plt.ylabel('der2')
-    plt.show()
+    # plt.subplot(2, 1, 1)
+    # plt.plot(orig.wavenums, orig.data, color='b')
+    # for line in indices:
+    #     plt.axvline(line, color='r')
+    # plt.ylabel('orig')
+    # plt.subplot(2, 1, 2)
+    # plt.plot(spc.wavenums, spc.data, color='b')
+    # for line in indices:
+    #     plt.axvline(line, color='r')
+    # plt.ylabel('der2')
+    # plt.show()
     init_amps = [0.8 * orig[amp][1] for amp in true_indices]
     init_widths = [len(orig) / len(true_indices) / 50] * len(true_indices)
     init_pos = [orig[ind][0] for ind in true_indices]
@@ -73,9 +71,9 @@ for spc in spa:
     bands = []
     for i in range(len(amps)):
         gaussians.append(Spectrum(x, gauss(x, amps[i], pos[i], widths[i])))
-        bands.append((np.round(gaussians[-1].auc(), 2), np.round(pos[i], 2)))
+        # bands.append((np.round(gaussians[-1].auc(), 2), np.round(pos[i], 2)))
         summ += gaussians[-1]
-    bands = list(map(lambda x: (np.round(x[0] / summ.auc(), 2), x[1]), bands))
+    # bands = list(map(lambda x: (np.round(x[0] / summ.auc(), 2), x[1]), bands))
     # bands = np.array(bands)
     # bands *= 100 / summ.auc()
     print(orig.clss, '\t', sorted(bands, key=lambda x: x[0],  reverse=True))
