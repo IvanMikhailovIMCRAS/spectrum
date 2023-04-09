@@ -1,5 +1,5 @@
 import pytest
-from src.filter import filter_opus
+from src.miscellaneous import filter_opus
 
 def test_filter_opus():
     assert filter_opus('sample_spectra/SD1.26'), 'Opus files should be available!'

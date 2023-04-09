@@ -111,5 +111,23 @@ def auto_heatmap(spc, step=100):
     # Rotate the tick labels and set their alignment.
     plt.setp(ax.get_xticklabels(), rotation=30, ha="right",
              rotation_mode="anchor")
-
     plt.show()
+
+def plot_margins(X, y, margins, path='', cm=None):
+    if not cm:
+        cm = plt.cm.get_cmap('tab20')
+    plt.figure(figsize=(20, 16))
+    plt.axhline(0)
+    lab = ''
+    counter = 0
+    for i, label in enumerate(y):
+        if lab != label:
+            lab = label
+            counter += 1
+            plt.plot(X[i, 0], margins[i], 'o', label=lab, color=cm.colors[counter])
+        else:
+            plt.plot(X[i, 0], margins[i], 'o', color=cm.colors[counter])
+    if path:
+        plt.savefig(path)
+    else:
+        plt.show()
