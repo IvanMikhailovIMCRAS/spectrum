@@ -37,8 +37,8 @@ def show_spectra(spectra, save_path='', wavenumbers=None):
     if len(clrs) > 1:
         plt.legend(clrs, loc=0)
     spectrum = spectra[-1]
-    if len(spectrum) > 1:
-        plt.xlim(spectrum.wavenums[0], spectrum.wavenums[-1])
+    # if len(spectrum) > 1:
+    #     plt.xlim(spectrum.wavenums[0], spectrum.wavenums[-1])
     # print(spectrum.wavenums[0], spectrum.wavenums[-1])
 
     plt.xlabel('Wavenumber, cm-1')

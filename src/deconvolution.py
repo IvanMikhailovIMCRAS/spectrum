@@ -110,7 +110,7 @@ class Deconvolutor:
     def deconvolute(self, pipeline_fixed=None, penalty=None, n_sigmas=None, verbose=False, save_directory=None):
         if not pipeline_fixed:
             pipeline_fixed = Deconvolutor.pipeline_fixed
-        w, d = dec.peaks_by_2der()
+        w, d = self.peaks_by_2der()
 
         # w_add = set()
         # for i in range(1, len(w)):
@@ -134,13 +134,13 @@ class Deconvolutor:
                 continue
             fixed_params = {f: params[f] for f in fixed}
             guess_params = {f: params[f] for f in Deconvolutor.vseq if f not in fixed}
-            print('predeconv')
+            # print('predeconv')
             peaks, inner_params = self._deconvolute(
                 guess_params,
                 fixed=fixed_params,
                 penalty=penalty
             )
-            print('postdeconv')
+            # print('postdeconv')
             params = inner_params
             if verbose:
                 show_curve_approx(self.spectrum, peaks, path=os.path.join(save_directory, str(fixed) + str(i) + '.jpg')

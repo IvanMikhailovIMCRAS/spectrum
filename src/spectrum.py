@@ -195,6 +195,7 @@ class Spectrum:
             return [iextr], [self.wavenums[iextr]]
         return indices, wavenums
 
+
     def standartize(self):
         self.data = (self.data - self.mean) / self.std
 

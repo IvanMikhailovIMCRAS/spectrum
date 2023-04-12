@@ -1,5 +1,6 @@
 from enumerations import Scale
 from numpy import square, sqrt, log, exp, zeros, std, mean
+import pickle
 
 def scale_change(scale_type):
     """
@@ -72,6 +73,14 @@ def filter_opus(path):
         except:
             return True
 
+def save_model(model, path):
+    with open(path, 'wb') as out:
+      pickle.dump(model, out)
 
+def load_model(path):
+    tmp = None
+    with open(path, 'rb') as inp:
+        tmp = pickle.load(inp)
+    return tmp
 
 
