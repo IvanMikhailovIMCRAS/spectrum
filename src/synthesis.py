@@ -4,7 +4,7 @@ import numpy as np
 from matrix import Matrix
 from enumerations import Scale
 import pandas as pd
-from scipy.stats import expon, mode, geom, norm
+from scipy.stats import expon, mode, geom, norm, uniform
 from miscellaneous import load_model
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
@@ -21,9 +21,14 @@ class Darwin:
     additional_transform = lambda x: x  # lambda x: np.exp(-x) if x > 0 else -x**2
     mutation_area_limits = (10, 26)
     norm_params = {
-        'mus': 2,
-        'widths': 1,
-        'amps': 0.005
+        'mus': 0.0001,
+        'widths': 0.0002,
+        'amps': 0.0005
+    }
+    uniform_params = {
+        'mus': 0.005,
+        'widths': 0.02,
+        'amps': 0.01
     }
 
 
@@ -125,6 +130,8 @@ class Darwin:
 
     def __peak_mutate(self, spc, hwl = 8):
         d = Deconvolutor(spc)
+        orig = spc * 1
+
         # define the mutation region
         wavenums = d.peaks_by_2der()[0]
         i = np.random.randint(0, len(wavenums))
@@ -133,7 +140,8 @@ class Darwin:
             if abs(j - i) > self.mutation_area_limits[0]:
                 break
         tmp_spc = spc.range(wavenums[i], wavenums[j])
-
+        start = tmp_spc[0][0]
+        length = len(tmp_spc)
         # deconvolute the region
         d.spectrum = tmp_spc
         peaks, params = d.deconvolute([
@@ -142,38 +150,69 @@ class Darwin:
             ('amps', 'voi',),
             ('mus', 'voi',)
         ])
-        _, wavenums = tmp_spc.get_extrema(locals=True, minima=True, include_edges=True)
+        peaks.sort(key=lambda x: x[1])
+        peaks = peaks[1:-1]
+        deconvoluted_band = Spectrum(orig.wavenums, peaks=peaks)
+        # deconvoluted_band.smooth(Smoother.moving_average, window_length=2 * hwl + 1)
 
+        from output import show_curve_approx
+        show_curve_approx(Spectrum(tmp_spc.wavenums, peaks=peaks), peaks)
+        _, wavenums = tmp_spc.get_extrema(locals=True, minima=True, include_edges=True)
         # form new region
-        for i in range(int(geom.rvs(p=1)) + 1):
+        cnt = 0
+        for i in range(int(geom.rvs(p=0.9))):
+            cnt += 1
             ind = np.random.randint(0, len(peaks))
             peaks[ind] = self.__change_band(peaks[ind])
-        print('Mutatuions: ', i)
-        return Spectrum(wavenums=tmp_spc.wavenums, peaks=peaks)
+        print('Mutatuions: ', cnt)
+        return (start, length), deconvoluted_band, Spectrum(wavenums=orig.wavenums, peaks=peaks)
 
     def mutate(self, data, hwl=8):
         from output import show_spectra, show_curve_approx
         spc = Spectrum(self.scale, data)
-        reconstructed = self.__peak_mutate(spc, hwl)
-        reconstructed.smooth(Smoother.moving_average, window_length=2 * hwl + 1)
-        reconstructed.smooth(Smoother.moving_average, window_length=2 * hwl + 1)
-        reconstructed = reconstructed.range(reconstructed.wavenums[hwl + 1], reconstructed.wavenums[-hwl - 1])
+        orig = spc * 1
+        (start, length), deconvoluted_band, reconstructed = self.__peak_mutate(spc, hwl)
+        # reconstructed.smooth(Smoother.moving_average, window_length=2 * hwl + 1)
+        # reconstructed = reconstructed.range(reconstructed.wavenums[hwl + 1], reconstructed.wavenums[-hwl - 1])
         #
         for i, (w, _) in enumerate(spc):
-            if abs(w - reconstructed.wavenums[0]) < Darwin.epsilon:
+            if abs(w - start) < Darwin.epsilon:
                 break
-        self.__correct_linearly(spc, reconstructed, i)
+        # self.__correct_linearly(spc, reconstructed, i)
+        
+        spc -= deconvoluted_band
+        spc += reconstructed
+        
+        show_spectra([deconvoluted_band, reconstructed])
+        
+        # spc.smooth(rangeind=(i, i + length ), window_length=2*hwl + 1)
+        # spc.smooth(rangeind=(i, i + length ), window_length=2*hwl + 1)
 
-        for j, intensity in enumerate(reconstructed.data):
-            spc.data[i + j] = intensity
+        # for j, intensity in enumerate(reconstructed.data):
+            # spc.data[i + j] = intensity
 
-        show_spectra([spc])
+        show_spectra([spc, orig])
 
     @staticmethod
     def __change_band(band):
+        # band = list(band)
+        # ind = np.random.randint(0, 3)
+        # sigma2 = band[ind] * Darwin.norm_params[Deconvolutor.vseq[ind]]
+        # print('SIGMA2: ', sigma2)
+        # noise = norm.rvs(0, sigma2)
+        # print('NOISE: ', noise)
+        # band[ind] += noise
+        # print(Deconvolutor.vseq[ind])
+        # return tuple(band)
         band = list(band)
-        ind = np.random.randint(0, 3)
-        band[ind] += norm.rvs(0, Darwin.norm_params[Deconvolutor.vseq[ind]])
+        ind = np.random.randint(1, 3)
+        rng = (band[ind] * (1 - Darwin.uniform_params[Deconvolutor.vseq[ind]]), 
+               band[ind] * (1 + Darwin.uniform_params[Deconvolutor.vseq[ind]]))
+        print('RANGE: ', rng)
+        noise = uniform.rvs(rng[0], rng[1] - rng[0])
+        print('NOISE: ', noise)
+        band[ind] = noise
+        print(Deconvolutor.vseq[ind])
         return tuple(band)
 
     @staticmethod
@@ -182,15 +221,16 @@ class Darwin:
         recon += v
         v = recon[-1][1] - spc[start + len(recon) - 1][1]
         a = v / (len(recon) - 1)
-        dely = np.arange(len(recon)) * a
+        dely = np.arange(0, len(recon)) * a
+        # dely = np.arange(len(recon), 0, -1) * a
         recon -= dely
 
 
 
 if __name__ == '__main__':
     print('SYNTHESIS')
-    d = Darwin()
-    d.download_population('../tmp/EH_preproc.csv')
+    d = Darwin('tmp/darwin_estimator.pkl')
+    d.download_population('tmp/EH_preproc.csv')
     d.mutate(d.current_population.iloc[0, :].to_numpy())
     # d.check()
     # d.form_generation(1000)

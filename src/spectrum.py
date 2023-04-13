@@ -131,10 +131,17 @@ class Spectrum:
         """
         self.data = Spectrum.__ATR_to_AB * self.data / self.wavenums
 
-    def smooth(self, method=Smoother.savgol, **kwargs):
+    def smooth(self, method=Smoother.savgol, rangeind=None, **kwargs):
         # пока один метод сглаживания, но можно дописать другие
         # self.data = savgol_filter(self.data, **kwargs)
-        self.data = method(self, **kwargs)
+        if not rangeind:
+            rangeind = (0, len(self) - 1)
+        spc = self.range(self[rangeind[0]][0], self[rangeind[1]][0])
+        newd = method(spc, **kwargs)
+        for i, pos in enumerate(list(range(*rangeind))):
+            self.data[pos] = newd[i] 
+        
+        # self.data = method(self, **kwargs)
 
     def get_derivative(self, n=1, win_width=13, order=5):
         """
