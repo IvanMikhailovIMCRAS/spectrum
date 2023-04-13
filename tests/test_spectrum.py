@@ -16,13 +16,13 @@ from src.enumerations import Scale
 import src.exceptions as exceptions
 import src.spectrum as spectrum
 from random import randint
-from src.filter import filter_opus
-from src.output import scale_change
+from src.miscellaneous import filter_opus
+from src.miscellaneous import scale_change
 print(sys.path)
 
 SPECTRA_PATHS = [
         'sample_spectra/first_class/SD4.17', 'sample_spectra/first_class/SD6.20',
-        'sample_spectra/second_class/SD7.17', 'sample_spectra/second_class/nested_class/SD9.60'
+        'sample_spectra/secnd_class/SD7.17', 'sample_spectra/second_class/nested_class/SD9.60'
     ]
 __OPS = {
         '+': lambda x, y: x + y,

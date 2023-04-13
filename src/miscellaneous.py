@@ -1,5 +1,6 @@
 from enumerations import Scale
-from numpy import square, sqrt, log, exp
+from numpy import square, sqrt, log, exp, zeros, std, mean
+import pickle
 
 def scale_change(scale_type):
     """
@@ -36,4 +37,50 @@ def lorentz(x, amp, x0, w):
 def voigt(x, amp, x0, w, gauss_prop):
     # assert 0 <= gauss_prop <= 1
     return gauss_prop * gauss(x, amp, x0, w) + (1 - gauss_prop) * lorentz(x, amp, x0, w)
+
+def summ_voigts(x, params):
+    data = zeros(len(x))
+    for amp, mu, w, g in params:
+        data += voigt(x, amp, mu, w, g)
+    return data
+
+def n_sigma_filter(sequence, n=1):
+    sigma = std(sequence)
+    mu = mean(sequence)
+    lo = mu - sigma * n
+    hi = mu + sigma * n
+    return [lo <= sequencei <= hi for sequencei in sequence]
+
+
+# def pack_dictionary(d, order):
+#     res = []
+#     for
+
+def filter_opus(path):
+    """
+    Check whether the file is a valid opus one.
+    params:
+    path: str - the path to the destination file
+    rtype: bool
+    """
+    ext = path[path.rfind('.') + 1:]
+    if not ext.isdigit():
+        return False
+    with open(path, 'r') as f:
+        try:
+            f.read()
+            return False
+        except:
+            return True
+
+def save_model(model, path):
+    with open(path, 'wb') as out:
+      pickle.dump(model, out)
+
+def load_model(path):
+    tmp = None
+    with open(path, 'rb') as inp:
+        tmp = pickle.load(inp)
+    return tmp
+
 

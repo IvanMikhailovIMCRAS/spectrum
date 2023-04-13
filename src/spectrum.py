@@ -7,6 +7,7 @@ from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx
 from baseline import baseline_alss, baseline_zhang, baseline_rubberband
 from scipy.interpolate import CubicHermiteSpline, CubicSpline, interp1d
 from smoothing import Smoother
+from miscellaneous import summ_voigts
 
 
 # add range
@@ -25,11 +26,14 @@ class Spectrum:
         '*': lambda x, y: x * y
     }
 
-    def __init__(self, wavenums=None, data=None, path='', clss: str = 'undefined'):
+    def __init__(self, wavenums=None, data=None, path='', clss: str = 'undefined', peaks=None):
         if wavenums is None:
             wavenums, data = np.array([], dtype=float), np.array([], dtype=float)
         self._path = path
-        if path and path.endswith('.csv'):
+        if peaks is not None:
+            self.data = summ_voigts(wavenums, peaks)
+            self.wavenums = wavenums
+        elif path and path.endswith('.csv'):
             self.wavenums, self.data, clss = Spectrum.read_csv(path)
         elif path:
             self.wavenums, self.data = Spectrum.__read_opus(path)
@@ -75,12 +79,6 @@ class Spectrum:
         """
         start, end = sorted([left, right])
         axis = not x
-        # start_ind = int((self.wavenums[0] - bigger) / self.step) if bigger < self.wavenums[0] else 0
-        # stop_ind = len(self) - int((lesser - self.wavenums[-1]) / self.step) if lesser > self.wavenums[-1] else len(
-        #     self)
-        # s = self * 1
-        # s.wavenums = s.wavenums[start_ind:stop_ind]
-        # s.data = s.data[start_ind:stop_ind]
         filtered = list(filter(lambda wi: start <= wi[axis] <= end, self))
         if not filtered:
             print('Incorrect range!')
@@ -137,8 +135,6 @@ class Spectrum:
         # пока один метод сглаживания, но можно дописать другие
         # self.data = savgol_filter(self.data, **kwargs)
         self.data = method(self, **kwargs)
-
-
 
     def get_derivative(self, n=1, win_width=13, order=5):
         """
@@ -198,6 +194,7 @@ class Spectrum:
         if not locals:
             return [iextr], [self.wavenums[iextr]]
         return indices, wavenums
+
 
     def standartize(self):
         self.data = (self.data - self.mean) / self.std
@@ -297,7 +294,7 @@ class Spectrum:
         rtype: bool
         '''
         return len(self) == len(other) \
-               and abs(self.wavenums[0] - other.wavenums[0]) / other.wavenums[0] < Spectrum.epsilon  \
+               and abs(self.wavenums[0] - other.wavenums[0]) / other.wavenums[0] < Spectrum.epsilon \
                and abs(self.wavenums[-1] - other.wavenums[-1]) / other.wavenums[-1] < Spectrum.epsilon
 
     def change_size(self, sample):
@@ -324,7 +321,6 @@ class Spectrum:
             if len(x) > 1:
                 return x[:-1], y[:-1]
             return x, y
-
 
     def save_as_csv(self, path, scale_type=Scale.WAVENUMBERS):
         """
@@ -359,7 +355,6 @@ class Spectrum:
         self.data = y
         # from scipy.integrate import quad
 
-
     def interpolate(self, x, mode=Smooth.CUBIC_SPLINE):
         # changed = False
         # if x[0] > x[1]:
@@ -374,7 +369,7 @@ class Spectrum:
         if reversed_x:
             oldx, oldy = self.wavenums[::-1], self.data[::-1]
         if mode == Smooth.CUBIC_SPLINE:
-            f = CubicSpline(oldx, oldy,)
+            f = CubicSpline(oldx, oldy, )
         elif mode == Smooth.LINEAR:
             f = interp1d(oldx, oldy)
             pass
@@ -406,7 +401,6 @@ class Spectrum:
             #     self *= -1
         # self.get_derivative(2)
 
-
     @classmethod
     def read_csv(cls, path):
         """
@@ -425,11 +419,13 @@ class Spectrum:
             clss, *data = csv.readline().strip().split(',')
             data = np.array(list(map(float, data)))
             return scale, data, clss
-    
+
+
 if __name__ == '__main__':
     print('Hi')
     from scan import get_spectra_list
     from output import show_spectra
+
     spa = get_spectra_list(path='../data', recursive=True)
     spc = spa[128]
     spec = spc * 1
