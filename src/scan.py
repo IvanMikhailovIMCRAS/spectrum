@@ -1,6 +1,6 @@
 from spectrum import Spectrum
 import os
-from filter import filter_opus
+from miscellaneous import filter_opus
 from enumerations import Scale
 from miscellaneous import scale_change
 import numpy as np

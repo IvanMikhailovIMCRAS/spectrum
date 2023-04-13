@@ -89,3 +89,5 @@ for spc in spa:
     # fitter.fit_delegator()
     # deconvoluted = [Spectrum(wavenums=x, data=gauss(x, *params)) for params in peaks]
     # show_spectra(deconvoluted + [orig])
+
+    import umap
