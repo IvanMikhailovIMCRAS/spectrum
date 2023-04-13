@@ -149,53 +149,55 @@ class Matrix():
                 #(stds[:, i] * np.abs(correls[:, i])).sum() / np.abs(correls[:, i]).sum()
                 ) #(tmp[:, i] * np.abs(correls[:, i])).sum() / np.abs(correls[:, i]).sum()
         return res
-                
-                
+                        
         
 
 if __name__ == '__main__':
     print('MATRIX')
-    spa = get_spectra_list(path='new_data', classify=True, recursive=False)
+    spa = get_spectra_list(path='new_data', classify=True, recursive=True)
     spc = spa[2]
     # spc.correct_baseline(BaseLineMode.ZHANG)
     from output import show_spectra
     # print(spc)
+    print(len(spa))
     example = spc * 1
     example.clss = 'ex'
     pre_0der_conf = {
         'baseline': {'method': BaseLineMode.RB},
         'normalize': {'method': NormMode.MINMAX},
-        'smooth': {'method': Smoother.moving_average, 'window_length': 13},
+        #'smooth': {'method': Smoother.moving_average, 'window_length': 13},
         #'derivative': {'n': 2}
     }
-    spa = [spc for spc in spa if 'heal' in spc.clss ]
+    print(*[spc.clss for spc in spa], sep='\n')
+    spa = [spc for spc in spa if 'heal' in spc.clss or 'epi' in spc.clss]
     mtr = Matrix.create_matrix(spa, {
         'baseline': {'method': BaseLineMode.RB},
         'normalize': {'method': NormMode.MINMAX},
         #'smooth': {'method': Smoother.moving_average, 'window_length': 13},
         # 'derivative': {'n': 2}
     })
-    for i, spc in enumerate(mtr.spectra):
-        mtr.spectra[i] = spc.range(1850., 600.)
+    # for i, spc in enumerate(mtr.spectra):
+    #     mtr.spectra[i] = spc.range(1850., 600.)
     
+    mtr.save_matrix('epi.csv')
 
     from output import heatmap
     import matplotlib.pyplot as plt
     from spectrum import Spectrum
     
-    correls = mtr.corr(lambda x: True)
-    d = mtr.get_stat_matrix()
-    art_spa_wiener = []
-    art_spa_movage = []
-    for i in range(10):
-        spc_art1 = Spectrum(mtr.spectra[0].wavenums, mtr.get_random_values(correls, d)) 
-        spc_art2 = spc_art1 * 1  
-        spc_art1.smooth(Smoother.wiener)
-        art_spa_wiener.append(spc_art1)
-        spc_art2.smooth(Smoother.moving_average, window_length=17)
-        art_spa_movage.append(spc_art2)
-    show_spectra(art_spa_wiener)
-    show_spectra(art_spa_movage)
+    # correls = mtr.corr(lambda x: True)
+    # d = mtr.get_stat_matrix()
+    # art_spa_wiener = []
+    # art_spa_movage = []
+    # for i in range(10):
+    #     spc_art1 = Spectrum(mtr.spectra[0].wavenums, mtr.get_random_values(correls, d)) 
+    #     spc_art2 = spc_art1 * 1  
+    #     spc_art1.smooth(Smoother.wiener)
+    #     art_spa_wiener.append(spc_art1)
+    #     spc_art2.smooth(Smoother.moving_average, window_length=17)
+    #     art_spa_movage.append(spc_art2)
+    # show_spectra(art_spa_wiener)
+    # show_spectra(art_spa_movage)
     # spc_art2 = Spectrum(mtr.spectra[0].wavenums, mtr.get_random_values(correls))
     # avg_spec = Spectrum(mtr.spectra[0].wavenums, mtr.average_by_point())
     
