@@ -3,7 +3,7 @@ import numpy as np
 import brukeropusreader as opus
 from scipy.signal import savgol_filter
 from enumerations import NormMode, BaseLineMode, Scale, Smooth
-from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx
+from exceptions import SpcCreationEx, SpcReadingEx, SpcChangeEx, SpcComparabilityEx
 from baseline import baseline_alss, baseline_zhang, baseline_rubberband
 from scipy.interpolate import CubicHermiteSpline, CubicSpline, interp1d
 from smoothing import Smoother
@@ -66,6 +66,16 @@ class Spectrum:
     def __iter__(self):
         for i in range(len(self)):
             yield self.wavenums[i], self.data[i]
+
+    def __xor__(self, other):
+        """
+        :param other: Spectrum
+        :return: float - cosine similarity
+        """
+        if self.is_comparable(other):
+            return np.dot(self.data, other.data) / np.linalg.norm(self.data) / np.linalg.norm(other.data)
+        else:
+            raise SpcComparabilityEx
 
     def range(self, left, right, x=True):
         """
@@ -145,14 +155,13 @@ class Spectrum:
 
     def get_derivative(self, n=1, win_width=13, order=5):
         """
-        Return the n-th derivative of intensity values array.
+        Calculate in-place the n-th derivative of intensity values array.
 
         params
         n: int - derivative order
         win_width: int - the window size (only odd numbers are allowed).
         order: the order of the polynomial used to approximate the derivative
 
-        rtype: numpy.ndarray(dtype=float)
         """
         if len(self) < 39:
             win_width = len(self) // 2 + 1

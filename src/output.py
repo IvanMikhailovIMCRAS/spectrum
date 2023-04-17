@@ -12,17 +12,15 @@ def show_spectra(spectra, save_path='', wavenumbers=None):
     colors = plt.cm.rainbow(np.linspace(0, 1, len(classes)))
     colors = dict(zip(classes, colors))
     plt.figure(figsize=(20, 8))
-    lines = []
-    clrs = []
-
+    class_color = dict.fromkeys(classes, None)
     for spc in spectra:
-        # if spc:
-        #     spectrum = spc
+
         if wavenumbers:
             spc = spc.range(*wavenumbers)
-        lines.append(plt.plot(spc.wavenums, spc.data, c=colors[spc.clss], linewidth=0.5))
-        clrs.append(spc.clss)
-    clrs = list(set(clrs))
+        line = plt.plot(spc.wavenums, spc.data, c=colors[spc.clss], linewidth=0.5)
+        class_color[spc.clss] = line[0]
+
+    # clrs = list(set(clrs))
     # font = {'family':'serif','color':'black','size':18}
     SMALL_SIZE = 16
     MEDIUM_SIZE = 18
@@ -34,8 +32,9 @@ def show_spectra(spectra, save_path='', wavenumbers=None):
     plt.rc('ytick', labelsize=MEDIUM_SIZE)  # fontsize of the tick labels
     plt.rc('legend', fontsize=BIGGER_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=MEDIUM_SIZE)  # fontsize of the figure title
-    if len(clrs) > 1:
-        plt.legend(clrs, loc=0)
+    labels, handlers = zip(*class_color.items())
+    if len(labels) > 1:
+        plt.legend(handlers, labels, loc=0)
     spectrum = spectra[-1]
     # if len(spectrum) > 1:
     #     plt.xlim(spectrum.wavenums[0], spectrum.wavenums[-1])
