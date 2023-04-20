@@ -8,6 +8,7 @@ class SpectrumEx(Exception):
                         format='%(asctime)s %(levelname)s %(message)s')
     def __init__(self, *args):
         super().__init__(*args)
+        self.message = ''
         msg = self.message if self.message else 'Error!'
         logging.error(msg, exc_info=True)
 
@@ -16,15 +17,33 @@ class SpectrumEx(Exception):
 
 class SpcChangeEx(SpectrumEx):
     def __init__(self, *args):
+        super().__init__(*args)
         self.message = args[0] if args else 'Spectra should have the same wavenumber ranges!'
 
 class SpcReadingEx(SpectrumEx):
     def __init__(self, *args):
+        super().__init__(*args)
         self.message = args[0] if args else 'File has been damaged. Failed to read.'
 
 class SpcCreationEx(SpectrumEx):
     def __init__(self, *args):
+        super().__init__(*args)
         self.message = args[0] if args else 'Invalid set of parameters!'
+
+class DrwSavingEx(SpectrumEx):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.message = args[0] if args else 'Unknown destination for population saving!'
+
+class DrwTransitionEx(SpectrumEx):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.message = args[0] if args else 'Failed to generate new population!'
+
+class SpcComparabilityEx(SpectrumEx):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.message = args[0] if args else 'Spectra are not comparable!'
 
 
 

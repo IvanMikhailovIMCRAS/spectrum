@@ -1,9 +1,11 @@
 import numpy as np
-# from spectrum import Spectrum
+from pandas import DataFrame
+from spectrum import Spectrum
 from enumerations import Scale, BaseLineMode, NormMode
 from scan import get_spectra_list, get_spectra_dict
 from miscellaneous import scale_change
 from smoothing import Smoother
+import matplotlib.pyplot as plt
 
 
 class Matrix():
@@ -38,13 +40,40 @@ class Matrix():
                 spc.get_derivative(**config['derivative'])
             if 'range' in config:
                 spc = spc.range(*config['range'])
-
             matrix.append(spc)
         return Matrix(matrix)
 
     @property
     def sample_spectrum(self):
         pass
+
+    @classmethod
+    def create_from_dataframe(cls, df: DataFrame):
+        spectra = []
+        classes = df.pop(df.columns[0])
+        scale = df.columns.astype(float)
+        for i in range(df.shape[0]):
+            spectra.append(
+                Spectrum(
+                    scale.to_numpy(),
+                    df.iloc[i, :],
+                    clss=classes.iloc[i]
+                )
+            )
+        return Matrix(spectra)
+
+    def differentiate(self, n=2):
+        for spc in self.spectra:
+            spc.get_derivative(n=n)
+
+    def similarity_hist(self):
+        similarities = []
+        n = len(self.spectra)
+        for i in range(n):
+            for j in range(i + 1, n):
+                similarities.append(self.spectra[i] ^ self.spectra[j])
+        plt.hist(similarities, bins=n)
+        plt.show()
 
     @classmethod
     def read_csv(cls, path, scale_type=Scale.WAVENUMBERS):
@@ -88,20 +117,6 @@ class Matrix():
         r = self.corr(predicate) + C
         r = np.triu(r, 1) - C
         return np.array(list(filter(lambda x: x >= -1, r.flatten())))
-
-    # def correlation(self):
-    #     avgs = sum(self.spectra) * (1 / self.shape[0])
-    #     res = np.zeros((self.shape[1], self.shape[1]))
-    #     mtr = self.as_2d_array()
-    #     print(mtr.shape, len(avgs))
-    #     def corr(spc):
-    #         for i in range(self.shape[1]):
-    #             for j in range(self.shape[1]):
-    #                 res[i][j] = ((mtr[:, i] - avgs[i])
-    #                              *
-    #                              (mtr[:, j] - avgs[j])).sum() / (
-    #                 np.sqrt(np.std(mtr[:, i]) * np.std(mtr[:, j])))
-    #         return res
 
     def average_by_point(self):
         res = np.zeros(self.shape[1])
@@ -179,18 +194,19 @@ if __name__ == '__main__':
         # 'derivative': {'n': 2}
     }
     # print(spa)
-    spa = [spc for spc in spa if 'heal' in spc.clss or 'not' in spc.clss]
+    spa = [spc for spc in spa if 'heal' in spc.clss or 'not' not in spc.clss]
     # print(list(map(lambda x: x.clss, spa)))
     mtr = Matrix.create_matrix(spa, {
         'baseline': {'method': BaseLineMode.RB},
         'normalize': {'method': NormMode.MINMAX},
-        # 'smooth': {'method': Smoother.moving_average, 'window_length': 13},
+        'smooth': {'method': Smoother.moving_average, 'window_length': 3},
         # 'derivative': {'n': 2}
-        # 'range': (1850., 600.)
+        'range': (1800., 600.),
     })
     show_spectra(mtr.spectra)
-    mtr.save_matrix('../tmp/DH_preproc.csv')
-
+    mtr.save_matrix('../tmp/EH_preproc_trunc.csv')
+    starts = list(map(lambda x: x[-1][1], mtr.spectra))
+    print(np.argmax(starts))
     from output import heatmap
     import matplotlib.pyplot as plt
     from spectrum import Spectrum
