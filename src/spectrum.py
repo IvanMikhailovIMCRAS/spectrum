@@ -10,12 +10,6 @@ from smoothing import Smoother
 from miscellaneous import summ_voigts
 
 
-# add range
-# show specta - give intervals
-# reader class common for spectrum and matrix?
-# interpolate
-# change size!!!
-
 class Spectrum:
     __ATR_to_AB = 1000
     spectrum_id = 0

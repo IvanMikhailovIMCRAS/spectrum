@@ -99,9 +99,7 @@ class Deconvolutor:
             xtol=10e-9,
             ftol=10e-9,
             bounds=list(zip(*[(0, np.inf)] * len(guess_v)))
-            # bounds=[(0, np.inf)] * len(guess_v)
         )
-        # print(res)
         res = res.x
         params = dict(**self.__split_in_equal(res, to_app), **fixed)
         peaks = list(zip(*[params[param] for param in Deconvolutor.vseq]))
@@ -134,13 +132,11 @@ class Deconvolutor:
                 continue
             fixed_params = {f: params[f] for f in fixed}
             guess_params = {f: params[f] for f in Deconvolutor.vseq if f not in fixed}
-            # print('predeconv')
             peaks, inner_params = self._deconvolute(
                 guess_params,
                 fixed=fixed_params,
                 penalty=penalty
             )
-            # print('postdeconv')
             params = inner_params
             if verbose:
                 show_curve_approx(self.spectrum, peaks, path=os.path.join(save_directory, str(fixed) + str(i) + '.jpg')

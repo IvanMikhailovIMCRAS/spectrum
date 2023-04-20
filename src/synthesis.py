@@ -36,6 +36,7 @@ class Darwin:
         'amps': 0.01
     }
     _misclassified_proportion = 0.1
+    _imbreeding_threshold = 0.99
 
     def __init__(self, estimator_path='../tmp/darwin_estimator.pkl', proba_distr=None):
         self._estimator = load_model(estimator_path)
@@ -93,10 +94,14 @@ class Darwin:
     def __select_to_breed(self, distr_generator, max_ind=-1, **kwargs):
         if max_ind == -1:
             max_ind = len(self.current_population) - 1
-        while True:
-            f, s = np.round(distr_generator.rvs(size=2, **kwargs))
-            if f <= max_ind and s <= max_ind:
+        maxiter = 100
+        while maxiter:
+            f, s = map(int, (distr_generator.rvs(size=2, **kwargs)))
+            if f <= max_ind and s <= max_ind and \
+                Spectrum(self.scale, self.current_population.iloc[f, :]) ^\
+                Spectrum(self.scale, self.current_population.iloc[s, :]) < self._imbreeding_threshold:
                 break
+            maxiter -= 1
         return int(f), int(s)
 
     def __sort_by_fitness(self, X:pd.DataFrame=None, y:pd.Series=None,
@@ -123,10 +128,13 @@ class Darwin:
         for _ in tqdm(range(gen_size // 2)):
             f, s = self.__select_to_breed(self.proba_distr)
             newf, news = self.breed(self.current_population.iloc[f, :], self.current_population.iloc[s, :])
-            if np.random.rand() <= self.mutation_proba:
-                news = self.mutate(news)
-            if np.random.rand() <= self.mutation_proba:
-                newf = self.mutate(newf)
+            try:
+                if np.random.rand() <= self.mutation_proba:
+                    news = self.mutate(news)
+                if np.random.rand() <= self.mutation_proba:
+                    newf = self.mutate(newf)
+            except Exception as ex:
+                print(ex)
             ng.append(newf)
             ng.append(news)
             new_labels.extend(self._estimator.predict(np.vstack([newf, news])))
@@ -203,20 +211,27 @@ class Darwin:
 
         # define the mutation region
         wavenums = d.peaks_by_2der()[0]
-        i = np.random.randint(0, len(wavenums))
-        while True:
-            j = np.random.randint(i - self._mutation_area_limits[1], i + 1 + self._mutation_area_limits[1])
-            if abs(j - i) > self._mutation_area_limits[0]:
+        cnt = 100
+        while cnt:
+            i = np.random.randint(0, len(wavenums) - 1)
+            j = np.random.randint(max(0, i - self._mutation_area_limits[1]),
+                              min(len(wavenums) - 1, i + self._mutation_area_limits[1]))
+            if abs(j - i) >= self._mutation_area_limits[0]:
                 break
+            cnt -= 1
+        # while True:
+        #     j = np.random.randint(i - self._mutation_area_limits[1], i + 1 + self._mutation_area_limits[1])
+        #     if abs(j - i) > self._mutation_area_limits[0] and 0 <= j < len(wavenums):
+        #         break
         tmp_spc = spc.range(wavenums[i], wavenums[j])
 
         # deconvolute the region
         d.spectrum = tmp_spc
         peaks, params = d.deconvolute([
-            ('voi', 'amps', 'mus'),
             ('voi', 'mus'),
-            ('amps', 'voi',),
-            ('mus', 'voi',)
+            # ('voi', 'mus'),
+            # ('amps', 'voi',),
+            # ('mus', 'voi',)
         ])
         peaks.sort(key=lambda x: x[1])
         peaks = peaks[1:-1]
@@ -231,7 +246,7 @@ class Darwin:
             cnt += 1
             ind = np.random.randint(0, len(peaks))
             peaks[ind] = self.__change_band(peaks[ind])
-        print('Mutatuions: ', cnt)
+        # print('Mutatuions: ', cnt)
         return deconvoluted_band, Spectrum(wavenums=orig.wavenums, peaks=peaks)
 
     def mutate(self, data):
@@ -241,7 +256,6 @@ class Darwin:
         deconvoluted_band, reconstructed = self.__peak_mutate(spc)
         spc -= deconvoluted_band
         spc += reconstructed
-        # show_spectra([spc, orig])
         return spc.data
 
     @staticmethod
@@ -250,11 +264,11 @@ class Darwin:
         ind = np.random.randint(1, 3)
         rng = (band[ind] * (1 - Darwin._uniform_params[Deconvolutor.vseq[ind]]),
                band[ind] * (1 + Darwin._uniform_params[Deconvolutor.vseq[ind]]))
-        print('RANGE: ', rng)
+        # print('RANGE: ', rng)
         noise = uniform.rvs(rng[0], rng[1] - rng[0])
-        print('NOISE: ', noise)
+        # print('NOISE: ', noise)
         band[ind] = noise
-        print(Deconvolutor.vseq[ind])
+        # print(Deconvolutor.vseq[ind])
         return tuple(band)
 
     def run(self, epochs, generation_size, conversion,
@@ -262,12 +276,13 @@ class Darwin:
             relearn_period=0):
         for i in range(epochs):
             need_fit = False
-            if relearn_period and  (i + 1) % relearn_period:
+            if relearn_period and (i + 1) % relearn_period:
                 need_fit = True
             self.form_generation(generation_size, need_fit=need_fit)
             if verbose:
                 counts = self.offspring_target.value_counts()
-                print(f'EPOCH: {i} generated 1: {counts[1]}, -1:{counts[-1]}')
+                print(f'EPOCH: {i} generated 1:' +
+                      f' {counts[1] if 1 in counts else 0}, -1:{counts[-1] if -1 in counts else 0}')
             try:
                 self.__generation_transition(conversion, replace=self.replace_elder_generation)
             except DrwTransitionEx as er:
@@ -284,25 +299,21 @@ class Darwin:
 
 if __name__ == '__main__':
     print('SYNTHESIS')
-    d = Darwin('../tmp/darwin_estimator.pkl')
-    d.mutation_proba = 0.0
-    d.download_population('../tmp/EH_preproc.csv')
-    d.run(2, 800, 0.6, verbose=True)
+    d = Darwin('../tmp/epilepsy/ehmod.pkl')
+    d.mutation_proba = 0.01
+    d.download_population('../tmp/epilepsy/EH_population.csv')
+    d.run(5, 800, 0.7, verbose=True, save_stages=True, directory=r'C:\Users\user\PycharmProjects\spectrum\tmp\epilepsy')
     # d.save_population('../tmp/population.csv')
 
+
     # d.download_population(r'C:\Users\user\PycharmProjects\spectrum\tmp\population.csv')
-    mtr = d.to_matrix()
+    # mtr = d.to_matrix()
     # mtr.differentiate()
     from output import show_spectra
     # show_spectra(mtr.spectra)
-    similarities = []
-    from itertools import product
-    indices = list(range(len(mtr.spectra)))
-    for i, j in tqdm(product(indices, indices), total=(len(indices) * (len(indices)))):
-        if i > j:
-            similarities.append(mtr.spectra[i] ^ mtr.spectra[j])
-    plt.hist(similarities, bins=len(indices))
-    plt.show()
+
+    # mtr.similarity_hist()
+    #
     # d.mutate(d.current_population.iloc[0, :].to_numpy())
     # d.check()
     # d.form_generation(1000)

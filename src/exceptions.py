@@ -8,6 +8,7 @@ class SpectrumEx(Exception):
                         format='%(asctime)s %(levelname)s %(message)s')
     def __init__(self, *args):
         super().__init__(*args)
+        self.message = ''
         msg = self.message if self.message else 'Error!'
         logging.error(msg, exc_info=True)
 

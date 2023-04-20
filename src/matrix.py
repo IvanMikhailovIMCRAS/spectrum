@@ -5,6 +5,7 @@ from enumerations import Scale, BaseLineMode, NormMode
 from scan import get_spectra_list, get_spectra_dict
 from miscellaneous import scale_change
 from smoothing import Smoother
+import matplotlib.pyplot as plt
 
 
 class Matrix():
@@ -64,6 +65,15 @@ class Matrix():
     def differentiate(self, n=2):
         for spc in self.spectra:
             spc.get_derivative(n=n)
+
+    def similarity_hist(self):
+        similarities = []
+        n = len(self.spectra)
+        for i in range(n):
+            for j in range(i + 1, n):
+                similarities.append(self.spectra[i] ^ self.spectra[j])
+        plt.hist(similarities, bins=n)
+        plt.show()
 
     @classmethod
     def read_csv(cls, path, scale_type=Scale.WAVENUMBERS):
@@ -184,18 +194,19 @@ if __name__ == '__main__':
         # 'derivative': {'n': 2}
     }
     # print(spa)
-    spa = [spc for spc in spa if 'heal' in spc.clss or 'not' in spc.clss]
+    spa = [spc for spc in spa if 'heal' in spc.clss or 'not' not in spc.clss]
     # print(list(map(lambda x: x.clss, spa)))
     mtr = Matrix.create_matrix(spa, {
         'baseline': {'method': BaseLineMode.RB},
         'normalize': {'method': NormMode.MINMAX},
-        # 'smooth': {'method': Smoother.moving_average, 'window_length': 13},
+        'smooth': {'method': Smoother.moving_average, 'window_length': 3},
         # 'derivative': {'n': 2}
-        # 'range': (1850., 600.)
+        'range': (1800., 600.),
     })
     show_spectra(mtr.spectra)
-    mtr.save_matrix('../tmp/DH_preproc.csv')
-
+    mtr.save_matrix('../tmp/EH_preproc_trunc.csv')
+    starts = list(map(lambda x: x[-1][1], mtr.spectra))
+    print(np.argmax(starts))
     from output import heatmap
     import matplotlib.pyplot as plt
     from spectrum import Spectrum
